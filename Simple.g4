@@ -48,6 +48,7 @@ grammar Simple;
     }
   }
 
+
   ArrayList<String> globalCodeLines = new ArrayList<String>();
   Map<String, FunctionIdentifier> functionTable = new HashMap();
   ArrayList<FunctionIdentifier> functionList = new ArrayList<FunctionIdentifier>();
