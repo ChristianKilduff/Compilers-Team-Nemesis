@@ -48,6 +48,26 @@ grammar Simple;
     }
   }
 
+
+  int strIteration = 0;
+  void addPrintLine(String line) {
+    String ref = "pstr" + strIteration;
+	      strIteration++;
+
+	    String assignStr = ".data\n"
+      + ref+": .asciz \""
+        + line
+        + "\"\n"
+        + ".text";
+
+		  String printStr = "la    a0, "+ref
+	      + "\nli    a7, 4"
+        +"\necall";
+	    if(isScopeGlobal()) {
+	      globalCodeLines.add(assignStr + "\n" + printStr);
+    }
+  }
+
   ArrayList<String> globalCodeLines = new ArrayList<String>();
   Map<String, FunctionIdentifier> functionTable = new HashMap();
   ArrayList<FunctionIdentifier> functionList = new ArrayList<FunctionIdentifier>();
@@ -220,13 +240,16 @@ grammar Simple;
   void emit(String s) {sb.append(s);}   
   //File generation
   void openProgram() {
-    emit("import java.util.*;\n");
-    emit("public class SimpleProgram {\n");
-    emit("static Scanner ___protected___in___ = new Scanner(System.in);\n");
+    // emit("import java.util.*;\n");
+    // emit("public class SimpleProgram {\n");
+    // emit("static Scanner ___protected___in___ = new Scanner(System.in);\n");
+
+
+	    emit("main:\n\t");
   }
 
   void writeFile() {
-    try (PrintWriter pw = new PrintWriter("SimpleProgram.java", "UTF-8")) {
+    try (PrintWriter pw = new PrintWriter("SimpleProgram.S", "UTF-8")) {
       for(int i=0; i<functionList.size(); i++) {
         FunctionIdentifier fid = functionList.get(i);
         for(String line : fid.code) {
@@ -234,12 +257,14 @@ grammar Simple;
         }
       }
       pw.print(sb.toString());
-      pw.print("public static void main(String[] args) throws Exception {\n");
+      // pw.print("public static void main(String[] args) throws Exception {\n");
       for(String line : globalCodeLines) {
           sb2.append(line + "\n");
       } 
       pw.print(sb2.toString());
-      pw.print("}\n}\n");
+
+
+      // pw.print("}\n}\n");
     } catch (Exception e) {
       System.err.println("error: failed to write SimpleProgram.java: " + e.getMessage());
     }
@@ -345,7 +370,7 @@ assignment
                   if(isDebug)
                     System.out.println(">>Array type: " +  newID.arrayType);
                     assignmentString += newID.id + "= new ArrayList<" + $a.javaType + ">();";
-                  addCodeLine(assignmentString);
+                  // addCodeLine(assignmentString);
 		              String appendString = "Collections.addAll("+newID.id+", new "+ $a.javaType +"[]{";
                   // add values
                   boolean isFirst = true;
@@ -359,12 +384,12 @@ assignment
                     }
                   }
                   appendString+="});";
-                  addCodeLine(appendString);
+                  // addCodeLine(appendString);
 
                 }
               if(!$typeOf.equals(Types.ARRAY)){
 	                assignmentString += $name.getText() + "=" + $value + ";";
-                  addCodeLine(assignmentString);
+                  // addCodeLine(assignmentString);
                 }
 
           } else { // if already exists then reassign
@@ -372,7 +397,7 @@ assignment
 	                error($name,"Cannot reassign arrays");
                 }
               newID.value = $value;
-              addCodeLine(newID.id + "=" + $value + ";");
+              // addCodeLine(newID.id + "=" + $value + ";");
 
           }
       if(isDebug)
@@ -444,10 +469,10 @@ statement:
 	| condition
 	| output
 	| 'break' {
-	    addCodeLine("break;");  
+	    // addCodeLine("break;");  
   }
 	| 'continue' {
-	    addCodeLine("continue;");  
+	    // addCodeLine("continue;");  
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
 	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
@@ -456,7 +481,7 @@ statement:
       } {
         String b = $y.asText;
         if(isFunctionReturning == 1) {
-          addCodeLine("return " + $y.asText + ";");
+          // addCodeLine("return " + $y.asText + ";");
         } else {
           error($at, "Error: function does not return a value");
         }
@@ -467,7 +492,7 @@ statement:
       error($at, "error attempting to call return outside a function");
       } {
         if(isFunctionReturning == 0) {
-          addCodeLine("return;");
+          // addCodeLine("return;");
         } else {
           error($at, "Error: function must return a value");
         }
@@ -476,16 +501,16 @@ statement:
 
 clear_array:
 	'clear ' n = VARIABLE_NAME {
-  addCodeLine($n.getText() + ".clear();");
+  // addCodeLine($n.getText() + ".clear();");
 };
 append_to_array:
 	'add ' v = varExprOrType ' to ' n = VARIABLE_NAME {
-  addCodeLine($n.getText() + ".add(" + $v.asText + ");");
+  // addCodeLine($n.getText() + ".add(" + $v.asText + ");");
 };
 
 array_length:
 	'assign ' v = VARIABLE_NAME ' length of ' n = VARIABLE_NAME {
-	    addCodeLine($v.getText() + "=" + $n.getText() + ".size();");
+	    // addCodeLine($v.getText() + "=" + $n.getText() + ".size();");
   };
 replace_index_array
 	locals[String index_code]:
@@ -497,7 +522,7 @@ replace_index_array
 	      $index_code = $i_v.getText();
     }
 	) ' with ' v = VARIABLE_NAME ' from ' l = VARIABLE_NAME {
-	  addCodeLine($l.getText() + ".set(" + $index_code + ", " + $v.getText() + ");");
+	  // addCodeLine($l.getText() + ".set(" + $index_code + ", " + $v.getText() + ");");
 };
 remove_from_array
 	locals[String index_code]:
@@ -509,7 +534,7 @@ remove_from_array
 	      $index_code = $i_v.getText();
     }
 	) ' from ' n = VARIABLE_NAME {
-	  addCodeLine($n.getText() + ".remove(" + $index_code + ");");
+	  // addCodeLine($n.getText() + ".remove(" + $index_code + ");");
 };
 
 get_from_array
@@ -536,7 +561,7 @@ get_from_array
         error($n, "type of array does not match type of variable");
       }  else {
 
-        addCodeLine(type + " " + $v.getText() + "="+$n.getText() + ".get(" + $index_code + ");");
+        // addCodeLine(type + " " + $v.getText() + "="+$n.getText() + ".get(" + $index_code + ");");
       }
     }
 };
@@ -712,20 +737,20 @@ if_statement
 	returns[String conditional]:
 	'is' c = condition {
 	  $conditional = $c.conditional;
-    addCodeLine("if(" + $conditional + ")");
+    // addCodeLine("if(" + $conditional + ")");
 };
 else_statement:
 	'if not' {
-  addCodeLine("else");
+  // addCodeLine("else");
 };
 
 if_scope:
 	'{' {
     addScopeLevel();
-    addCodeLine("{"); // } – for some reason quoted brackets mess up vscode
+    // addCodeLine("{"); // } – for some reason quoted brackets mess up vscode
     } statement* '}' {removeScopeLevel();
     // { – for some reason quoted brackets mess up vscode
-    addCodeLine("}");
+    // addCodeLine("}");
     };
 
 if_else:
@@ -739,14 +764,14 @@ for_statement
    $repeats = $n.getText();
 
    String i_name = "____protected_index____" + getScopeLevel();
-	 addCodeLine("for (int " +i_name +" = 0; " +i_name +" < " + $repeats + "; " +i_name +"++)" + " {"); // } 
+	//  addCodeLine("for (int " +i_name +" = 0; " +i_name +" < " + $repeats + "; " +i_name +"++)" + " {"); // } 
   } loopScope;
 
 while_statement
 	returns[String conditional]:
 	'while' c = condition {
     $conditional = $c.conditional;
-    addCodeLine("while(" + $conditional + ") {"); //}
+    // addCodeLine("while(" + $conditional + ") {"); //}
   } loopScope;
 
 loopScope:
@@ -755,14 +780,14 @@ loopScope:
     } (
 		statement
 		| 'continue' {
-	       addCodeLine("continue;");   
+	      //  addCodeLine("continue;");   
     }
 		| 'break' {
-	      addCodeLine("break;");   
+	      // addCodeLine("break;");   
     }
 	)* '}' {removeScopeLevel();
     // { – for some reason quoted brackets mess up vscode
-    addCodeLine("}");
+    // addCodeLine("}");
     };
 
 functionDefinition
@@ -888,9 +913,9 @@ functionDefinition
       $arity = $variableParamNames.size();
       createFunction($name, $arity, $doesReturn, $returnType);
       if ($arity > 0) {
-        addCodeLine("public static " + $returnType + " " + $name + "(" + $s + ") {"); // }
+        // addCodeLine("public static " + $returnType + " " + $name + "(" + $s + ") {"); // }
       } else {
-        addCodeLine("public static " + $returnType + " " + $name + "() {"); // }
+        // addCodeLine("public static " + $returnType + " " + $name + "() {"); // }
       } 
     }
     
@@ -904,7 +929,7 @@ functionDefinition
     //createFunction($name, $arity, $doesReturn);
     functionList.add(getFunction($name));
     //{
-    addCodeLine("}");
+    // addCodeLine("}");
     isFunctionReturning = -1;
     exitMainScope();
 };
@@ -960,7 +985,7 @@ functionCall
               $code = ID.id + "=" + $code;
         }
       }
-        addCodeLine($code);
+        // addCodeLine($code);
     }
   };
 
@@ -968,15 +993,15 @@ input: input_decimal | input_string | input_number;
 
 input_string:
 	'input string ' a = VARIABLE_NAME {
-	    addCodeLine($a.getText()+"=___protected___in___.nextLine();");
+	    // addCodeLine($a.getText()+"=___protected___in___.nextLine();");
 };
 input_number:
 	'input number ' a = VARIABLE_NAME {
-	    addCodeLine($a.getText()+"=___protected___in___.nextInt();");
+	    // addCodeLine($a.getText()+"=___protected___in___.nextInt();");
 };
 input_decimal:
 	'input decimal ' a = VARIABLE_NAME {
-	    addCodeLine($a.getText()+"=___protected___in___.nextDouble();");
+	    // addCodeLine($a.getText()+"=___protected___in___.nextDouble();");
 
 };
 
@@ -1024,10 +1049,12 @@ output
 		)?
 	) {
     if($inline) {
-	      addCodeLine("System.out.print("+ $v.value + ");");
+	      // addCodeLine("System.out.print("+ $v.value + ");");
     } else {
-	      addCodeLine("System.out.println("+ $v.value + ");");
+	      // addCodeLine("System.out.println("+ $v.value + ");");
     }
+
+	    addPrintLine($v.value);
   };
 
 varExprOrType
