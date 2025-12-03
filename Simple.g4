@@ -44,31 +44,36 @@ grammar Simple;
     if(isScopeGlobal()) {
 	      globalCodeLines.add(line);
     } else {
-	      functionTable.get(getScope()).addLine(line);
+        addToCodeBlock(getScope(),line);
     }
   }
 
 
   int strIteration = 0;
   void addPrintLine(String line) {
-    String ref = "pstr" + strIteration;
+    String ref = "\tpstr" + strIteration;
 	      strIteration++;
 
 	    String assignStr = ".data\n"
       + ref+": .asciz \""
         + line
-        + "\"\n"
+        + "\"\n\t"
         + ".text";
 
-		  String printStr = "la    a0, "+ref
-	      + "\nli    a7, 4"
-        +"\necall";
-	    if(isScopeGlobal()) {
-	      globalCodeLines.add(assignStr + "\n" + printStr);
-    }
+		  String printStr = "\tla    a0, "+ref
+	      + "\n\tli    a7, 4"
+        +"\n\tecall";
+	      addCodeLine(assignStr + "\n" + printStr + "\n");
   }
 
-  ArrayList<String> globalCodeLines = new ArrayList<String>();
+  void addPrintNewLine() {
+		      addCodeLine("call print_newline");
+  }
+
+  
+	ArrayList<String> globalCodeLines = new ArrayList<String>();
+  Map<String, ArrayList<String>> codeBlockLines = new HashMap();
+
   Map<String, FunctionIdentifier> functionTable = new HashMap();
   ArrayList<FunctionIdentifier> functionList = new ArrayList<FunctionIdentifier>();
   FunctionIdentifier getFunction(String name) {
@@ -107,6 +112,12 @@ grammar Simple;
       }
   }
 
+  void addToCodeBlock(String name, String code) {
+    if(codeBlockLines.get(name) == null) codeBlockLines.put(name, new ArrayList<String>());
+
+	  codeBlockLines.get(name).add(code);
+  }
+
   int isFunctionReturning = 0;
 
 	ScopedSymbolTable scopedSymbolTable = new ScopedSymbolTable();
@@ -116,6 +127,10 @@ grammar Simple;
   void setMainScope(String functionName) {
     currScope = functionName;
     scopedSymbolTable.put(functionName, new ArrayList<SymbolTable>());
+  }
+
+  void setScope(String name) {
+	     currScope = name;
   }
 
   void exitMainScope() {
@@ -240,12 +255,11 @@ grammar Simple;
   void emit(String s) {sb.append(s);}   
   //File generation
   void openProgram() {
-    // emit("import java.util.*;\n");
-    // emit("public class SimpleProgram {\n");
-    // emit("static Scanner ___protected___in___ = new Scanner(System.in);\n");
-
-
-	    emit("main:\n\t");
+    emit(".text"
+    + "\n.globl main"
+    + "\n.globl end"
+    + "\n.globl print_newline\n\n");
+    emit("main:\n");
   }
 
   void writeFile() {
@@ -259,17 +273,51 @@ grammar Simple;
       pw.print(sb.toString());
       // pw.print("public static void main(String[] args) throws Exception {\n");
       for(String line : globalCodeLines) {
-          sb2.append(line + "\n");
+          sb2.append("\t"+line + "\n");
       } 
       pw.print(sb2.toString());
 
+      
 
-      // pw.print("}\n}\n");
+	      pw.print(
+	    "\tjal end\n");
+
+	      for(String key : codeBlockLines.keySet()) {
+          pw.print(key + ": \n");
+          for(String line : codeBlockLines.get(key)) {
+            pw.print("\t"+line + "\n");
+        } 
+      }
+
+      pw.print("\nprint_newline:"
+	    + "\n\tli    a0, '\\n'"
+		    + "\n\tli    a7, 11"
+		    + "\n\tecall"
+		    + "\n\tret"
+
+		    + "\nend:\n"
+        + "\t# print new line\n"
+        +"\tcall print_newline\n"
+		    + "\n\tli    a0, 0     # Load the exit code (e.g., 0 for success) into a0"
+		    + "\n\tli    a7, 93    # Load the Exit2 syscall number into a7"
+		    + "\n\tecall        # Execute the system call to exit"
+    );
     } catch (Exception e) {
       System.err.println("error: failed to write SimpleProgram.java: " + e.getMessage());
     }
 
-  }
+  }//}
+
+
+	  int loop_index = 0;
+	    String returnToBlock = "";
+    void setReturnToMainBlock(String name) {
+	        returnToBlock = name;
+    }
+
+    void clearReturnToBlock() {
+	      returnToBlock = "";
+    }
 }
 prog:
 	{
@@ -460,8 +508,8 @@ statement:
 	| replace_index_array
 	| array_length
 	| functionCall
-	| assignment
 	| for_statement
+	| assignment
 	| while_statement
 	| input
 	| expr
@@ -469,10 +517,13 @@ statement:
 	| condition
 	| output
 	| 'break' {
-	    // addCodeLine("break;");  
+      if(!isScopeGlobal() && returnToBlock != "")
+	      addCodeLine("call " + returnToBlock);
+      
   }
 	| 'continue' {
-	    // addCodeLine("continue;");  
+      if(!isScopeGlobal())
+        addCodeLine("call " + getScope());
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
 	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
@@ -744,7 +795,8 @@ else_statement:
   // addCodeLine("else");
 };
 
-if_scope:
+if_scope
+	returns[ArrayList<String> codeLines]:
 	'{' {
     addScopeLevel();
     // addCodeLine("{"); // } – for some reason quoted brackets mess up vscode
@@ -759,13 +811,29 @@ if_else:
 	)?;
 
 for_statement
-	returns[String repeats]:
+	returns[String repeats, String start_block_name, String loop_block_name, String return_to_main_name]
+		:
 	'repeat' (n = INT | n = VARIABLE_NAME) {
-   $repeats = $n.getText();
+		    
+      $repeats = $n.getText();
+      $loop_block_name="______protected___for____" + loop_index++;
+      $start_block_name = "____start" + $loop_block_name;
+      $return_to_main_name = "____return_from" + $loop_block_name;
+      addCodeLine("call "+$loop_block_name);
+      addCodeLine($return_to_main_name + ":");
+	    
+      setScope($loop_block_name);
+    // String i_name = "____protected_index____" + getScopeLevel();
+	    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
+      addToCodeBlock($start_block_name, "call " + $loop_block_name);
+	    addToCodeBlock($loop_block_name, "li t1, " + $repeats);
+      addToCodeBlock($loop_block_name, "addi t0, t0, 1");
+      addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
+      addToCodeBlock($loop_block_name,"call " + $return_to_main_name);
 
-   String i_name = "____protected_index____" + getScopeLevel();
-	//  addCodeLine("for (int " +i_name +" = 0; " +i_name +" < " + $repeats + "; " +i_name +"++)" + " {"); // } 
-  } loopScope;
+	      returnToBlock = $return_to_main_name;
+  } loopScope {
+  };
 
 while_statement
 	returns[String conditional]:
@@ -776,18 +844,11 @@ while_statement
 
 loopScope:
 	'{' {
-	  addScopeLevel();
-    } (
-		statement
-		| 'continue' {
-	      //  addCodeLine("continue;");   
-    }
-		| 'break' {
-	      // addCodeLine("break;");   
-    }
-	)* '}' {removeScopeLevel();
-    // { – for some reason quoted brackets mess up vscode
-    // addCodeLine("}");
+	  // addScopeLevel();
+    } statement* '}' {
+    // removeScopeLevel();
+    exitMainScope();
+	    returnToBlock = "";
     };
 
 functionDefinition
@@ -1010,15 +1071,18 @@ printType
 	INT {
     $hasKnownValue = true; 
     $value = $INT.getText();
-	  $code = "System.out.println(" + $value + ");";
+	  // $code = "System.out.println(" + $value + ");";
   }
 	| DECIMAL {$hasKnownValue = true; 
   $value = $DECIMAL.getText();
-		  $code = "System.out.println(" + $value + ");";
+		  // $code = "System.out.println(" + $value + ");";
   }
 	| STRING {$hasKnownValue = true; 
-  $value = $STRING.getText();
-		  $code = "System.out.println("+$value+");";
+    $value = $STRING.getText();
+
+    // remove ""
+	    $value = $value.substring(1, $value.length() - 1);
+    $code = "System.out.println("+$value+");";
     }
 	| VARIABLE_NAME {
         String id = $VARIABLE_NAME.getText();
@@ -1029,14 +1093,14 @@ printType
           // General use-before-assign.
           error($VARIABLE_NAME, "use of variable '" + id + "' before assignment");
         } else{
-            $code = "System.out.println(" + id + ");";
+            // $code = "System.out.println(" + id + ");";
         }
         $hasKnownValue = false;
       }
 	| expr {
           $hasKnownValue = true; 
           $value = String.valueOf($expr.value); 
-          $code = "System.out.println("+String.valueOf($expr.value)+");";
+          // $code = "System.out.println("+String.valueOf($expr.value)+");";
 		};
 
 output
@@ -1049,12 +1113,11 @@ output
 		)?
 	) {
     if($inline) {
-	      // addCodeLine("System.out.print("+ $v.value + ");");
+        addPrintLine($v.value);
     } else {
-	      // addCodeLine("System.out.println("+ $v.value + ");");
+        addPrintLine($v.value);
+        addPrintNewLine();
     }
-
-	    addPrintLine($v.value);
   };
 
 varExprOrType
