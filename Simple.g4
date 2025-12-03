@@ -894,15 +894,15 @@ for_statement
 
       enterLoop($loop_block_name, $return_to_block);
 
-      addCodeLine("call "+$loop_block_name);
-	    
-      // String i_name = "____protected_index____" + getScopeLevel();
-	    addCodeLine($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
-      addCodeLine($start_block_name, "call " + $loop_block_name);
+      call($loop_block_name);
+      addCodeLine($start_block_name + ": ");
+	    addCodeLine("\tli t0, 0 # stores in t0 which may and likely will overide other things");
+      call($loop_block_name);
       
-      addToCodeBlock($loop_block_name, "li t1, " + $repeats);
-      addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-      addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_block);
+      addCodeLine($loop_block_name + ":");
+      addCodeLine("li t1, " + $repeats);
+      addCodeLine("addi t0, t0, 1");
+      addCodeLine("bgt t0, t1, "+ $return_to_block);
   } loopScope {
       addLoopCall();
       addCodeLine($return_to_block + ":");
@@ -920,8 +920,8 @@ while_statement
     // addCodeLine()
 
     
-    addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-    addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_block);
+    addCodeLine("addi t0, t0, 1");
+    addCodeLine("bgt t0, t1, "+ $return_to_block);
 
     
 

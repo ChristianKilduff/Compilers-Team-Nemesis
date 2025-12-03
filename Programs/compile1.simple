@@ -1,9 +1,5 @@
 print "hi"
 repeat 3 {
-    is 1 greater than 3 {
-        print 1
-    } if not {
-        print 3
-    }
+
 }
 print "done"
