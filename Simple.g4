@@ -860,7 +860,6 @@ while_statement
     addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
     addToCodeBlock($start_block_name, "call " + $loop_block_name);
     
-    // addToCodeBlock($loop_block_name, "li t1, " + $repeats);
     addToCodeBlock($loop_block_name, "addi t0, t0, 1");
     addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
 
