@@ -51,21 +51,26 @@ grammar Simple;
 
   int strIteration = 0;
   void addPrintLine(String line) {
-    String ref = "pstr" + strIteration;
+    String ref = "\tpstr" + strIteration;
 	      strIteration++;
 
 	    String assignStr = ".data\n"
       + ref+": .asciz \""
         + line
-        + "\"\n"
+        + "\"\n\t"
         + ".text";
 
-		  String printStr = "la    a0, "+ref
-	      + "\nli    a7, 4"
-        +"\necall";
+		  String printStr = "\tla    a0, "+ref
+	      + "\n\tli    a7, 4"
+        +"\n\tecall";
 	    if(isScopeGlobal()) {
 	      globalCodeLines.add(assignStr + "\n" + printStr);
     }
+  }
+
+  void addPrintNewLine() {
+		    if(isScopeGlobal()) 
+	      globalCodeLines.add("call print_newline");
   }
 
   ArrayList<String> globalCodeLines = new ArrayList<String>();
@@ -240,12 +245,11 @@ grammar Simple;
   void emit(String s) {sb.append(s);}   
   //File generation
   void openProgram() {
-    // emit("import java.util.*;\n");
-    // emit("public class SimpleProgram {\n");
-    // emit("static Scanner ___protected___in___ = new Scanner(System.in);\n");
-
-
-	    emit("main:\n\t");
+    emit(".text"
+    + "\n.globl main"
+    + "\n.globl end"
+    + "\n.globl print_newline\n\n");
+    emit("main:\n");
   }
 
   void writeFile() {
@@ -259,12 +263,25 @@ grammar Simple;
       pw.print(sb.toString());
       // pw.print("public static void main(String[] args) throws Exception {\n");
       for(String line : globalCodeLines) {
-          sb2.append(line + "\n");
+          sb2.append("   "+line + "\n");
       } 
       pw.print(sb2.toString());
 
 
       // pw.print("}\n}\n");
+	      pw.print(
+	    "\tjal end\n"
+    + "\nprint_newline:"
+	    + "\n\tli    a0, '\\n'"
+		    + "\n\tli    a7, 11"
+		    + "\n\tecall"
+		    + "\n\tret"
+
+		    + "\nend:"
+		    + "\n\tli    a0, 0     # Load the exit code (e.g., 0 for success) into a0"
+		    + "\n\tli    a7, 93    # Load the Exit2 syscall number into a7"
+		    + "\n\tecall        # Execute the system call to exit"
+    );
     } catch (Exception e) {
       System.err.println("error: failed to write SimpleProgram.java: " + e.getMessage());
     }
@@ -1049,12 +1066,11 @@ output
 		)?
 	) {
     if($inline) {
-	      // addCodeLine("System.out.print("+ $v.value + ");");
+        addPrintLine($v.value);
     } else {
-	      // addCodeLine("System.out.println("+ $v.value + ");");
+        addPrintLine($v.value);
+        addPrintNewLine();
     }
-
-	    addPrintLine($v.value);
   };
 
 varExprOrType
