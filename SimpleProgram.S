@@ -4,52 +4,92 @@
 .globl print_newline
 
 main:
+	li t0, 4
+	li t1, 3
+	bgt t0,t1,____IF____protected___Conditional____1
+	call ____ELSE____protected___Conditional____1
+	____IF____protected___Conditional____1: 
+	li t1, 7
+	bgt t0,t1,____IF____protected___Conditional____2
+	call ____ELSE____protected___Conditional____2
+	____IF____protected___Conditional____2: 
 	.data
-	pstr0: .asciz "x"
+	pstr0: .asciz "6"
 	.text
 	la    a0, 	pstr0
 	li    a7, 4
 	ecall
 
 	call print_newline
-	call ______protected___for____0
-	____return_from______protected___for____0:
+	call ____AFTER____protected___Conditional____2
+	____ELSE____protected___Conditional____2: 
 	.data
-	pstr3: .asciz "done"
-	.text
-	la    a0, 	pstr3
-	li    a7, 4
-	ecall
-
-	call print_newline
-	jal end
-____start______protected___for____0: 
-		li t0, 0 # stores in t0 which may and likely will overide other things
-	call ______protected___for____0
-____PROTECTED_IF_FALSE____0: 
-	
-______protected___for____0: 
-	addi t0, t0, 1
-	bgt t0, t1, ____return_from______protected___for____0
-	.data
-	pstr1: .asciz "4"
+	pstr1: .asciz "99"
 	.text
 	la    a0, 	pstr1
 	li    a7, 4
 	ecall
 
 	call print_newline
+	____AFTER____protected___Conditional____2: 
 	.data
-	pstr2: .asciz "7"
+	pstr2: .asciz "4"
 	.text
 	la    a0, 	pstr2
 	li    a7, 4
 	ecall
 
 	call print_newline
-	call ______protected___for____0
-____PROTECTED_IF_TRUE____0: 
-	
+	call ____AFTER____protected___Conditional____1
+	____ELSE____protected___Conditional____1: 
+	li t1, 2
+	bgt t0,t1,____IF____protected___Conditional____3
+	call ____ELSE____protected___Conditional____3
+	____IF____protected___Conditional____3: 
+	.data
+	pstr3: .asciz "3"
+	.text
+	la    a0, 	pstr3
+	li    a7, 4
+	ecall
+
+	call print_newline
+	call ____AFTER____protected___Conditional____3
+	____ELSE____protected___Conditional____3: 
+	li t1, 1
+	bgt t0,t1,____IF____protected___Conditional____4
+	call ____ELSE____protected___Conditional____4
+	____IF____protected___Conditional____4: 
+	.data
+	pstr4: .asciz "2"
+	.text
+	la    a0, 	pstr4
+	li    a7, 4
+	ecall
+
+	call print_newline
+	call ____AFTER____protected___Conditional____4
+	____ELSE____protected___Conditional____4: 
+	.data
+	pstr5: .asciz "1"
+	.text
+	la    a0, 	pstr5
+	li    a7, 4
+	ecall
+
+	call print_newline
+	____AFTER____protected___Conditional____4: 
+	____AFTER____protected___Conditional____3: 
+	____AFTER____protected___Conditional____1: 
+	.data
+	pstr6: .asciz "done"
+	.text
+	la    a0, 	pstr6
+	li    a7, 4
+	ecall
+
+	call print_newline
+	jal end
 
 print_newline:
 	li    a0, '\n'
