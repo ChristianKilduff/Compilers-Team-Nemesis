@@ -823,7 +823,7 @@ for_statement
 		:
 	'repeat' (n = INT | n = VARIABLE_NAME) {
       $repeats = $n.getText();
-      $loop_block_name="______protected___for____" + loop_index++;
+      $loop_block_name="______protected___loop____" + loop_index++;
       $start_block_name = "____start" + $loop_block_name;
       $return_to_main_name = "____return_from" + $loop_block_name;
       addCodeLine("call "+$loop_block_name);
@@ -849,7 +849,7 @@ while_statement
 	'while' c = condition {
     $conditional = $c.conditional;
 
-    $loop_block_name="______protected___for____" + loop_index++;
+    $loop_block_name="______protected___loop____" + loop_index++;
     $start_block_name = "____start" + $loop_block_name;
     $return_to_main_name = "____return_from" + $loop_block_name;
     addCodeLine("call "+$loop_block_name);
