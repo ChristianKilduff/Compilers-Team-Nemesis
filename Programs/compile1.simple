@@ -1,5 +1,9 @@
-is x greater than 5 {
-
-} if not is y less than or equal to 3 {
-    
+print "hi"
+repeat 3 {
+    is 1 greater than 3 {
+        print 1
+    } if not {
+        print 3
+    }
 }
+print "done"

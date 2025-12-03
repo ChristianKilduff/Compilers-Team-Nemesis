@@ -310,16 +310,44 @@ grammar Simple;
 
 
 	  int loop_index = 0;
-    String returnToBlock = "";
-    void setReturnToMainBlock(String name) {
-	        returnToBlock = name;
+    void enterLoop(String block_name, String return_name) {
+      loopBlocks.push(block_name);
+      loopReturnBlocks.push(return_name);
     }
 
-    void clearReturnToBlock() {
-	      returnToBlock = "";
+    String getCurrLoopReturn() {
+	      return loopReturnBlocks.peek();
+    }
+
+    String finishLoop() {
+      loopBlocks.pop();
+	    return loopReturnBlocks.pop();
+    }
+
+    void addLoopCall() {
+      addCodeLine("call " + loopBlocks.peek());
+    }
+
+    boolean isInLoop() {
+      return !loopReturnBlocks.isEmpty();
+    }
+
+    String getLoop() {
+	      return loopBlocks.peek();
+    }
+
+    String getLoopReturn() {
+        return loopReturnBlocks.peek();
     }
 
 	int condition_index = 0;
+
+  Stack<String> loopBlocks = new Stack<String>();
+  Stack<String> loopReturnBlocks = new Stack<String>();
+
+  void call(String name) {
+    addCodeLine("call " + name);
+  }
 }
 prog:
 	{
@@ -519,13 +547,13 @@ statement:
 	| condition
 	| output
 	| 'break' {
-      if(!isScopeGlobal() && returnToBlock != "")
-	      addCodeLine("call " + returnToBlock);
+      if(!loopReturnBlocks.empty())
+          call(getCurrLoopReturn());
       
   }
 	| 'continue' {
       if(!isScopeGlobal())
-        addCodeLine("call " + getScope());
+        addLoopCall();
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
 	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
@@ -838,7 +866,7 @@ if_else
     $elseBlock = "____ELSE____protected___Conditional____" + $index;
 
 
-    // TODO condition
+    // TODO condition values (rn just using t0 ? t1)
     // addCodeLine("li t0, " + $i.a);
     addCodeLine("li t1, " + $i.b);
     addCodeLine($i.risc_word+" t0,t1," + $ifBlock);
@@ -856,57 +884,58 @@ if_else
   };
 
 for_statement
-	returns[String repeats, String start_block_name, String loop_block_name, String return_to_main_name]
+	returns[String repeats, String start_block_name, String loop_block_name, String return_to_block]
 		:
 	'repeat' (n = INT | n = VARIABLE_NAME) {
       $repeats = $n.getText();
       $loop_block_name="______protected___loop____" + loop_index++;
       $start_block_name = "____start" + $loop_block_name;
-      $return_to_main_name = "____return_from" + $loop_block_name;
+      $return_to_block = "____return_from" + $loop_block_name;
+
+      enterLoop($loop_block_name, $return_to_block);
+
       addCodeLine("call "+$loop_block_name);
-      addCodeLine($return_to_main_name + ":");
 	    
-      setScope($loop_block_name);
       // String i_name = "____protected_index____" + getScopeLevel();
-	    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
-      addToCodeBlock($start_block_name, "call " + $loop_block_name);
+	    addCodeLine($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
+      addCodeLine($start_block_name, "call " + $loop_block_name);
       
       addToCodeBlock($loop_block_name, "li t1, " + $repeats);
       addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-      addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
-
-	    returnToBlock = $return_to_main_name;
+      addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_block);
   } loopScope {
-      addToCodeBlock($loop_block_name, "call " + $loop_block_name);
+      addLoopCall();
+      addCodeLine($return_to_block + ":");
+      finishLoop();
   };
 
 while_statement
-	returns[String conditional, String loop_block_name, String return_to_main_name]:
+	returns[String conditional, String loop_block_name, String return_to_block]:
 	'while' c = condition {
     $loop_block_name="______protected___loop____" + loop_index++;
-    $return_to_main_name = "____return_from" + $loop_block_name;
+    $return_to_block = "____return_from" + $loop_block_name;
+
+    enterLoop($loop_block_name, $return_to_block);
     addCodeLine("call "+$loop_block_name);
-    addCodeLine($return_to_main_name + ":");
-    setScope($loop_block_name);
-    // String i_name = "____protected_index____" + getScopeLevel();
+    // addCodeLine()
 
     
     addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-    addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
+    addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_block);
 
-    returnToBlock = $return_to_main_name;    
+    
 
   } loopScope {
-      addToCodeBlock($loop_block_name, "call " + $loop_block_name);
+      addLoopCall();
+      addCodeLine($return_to_block + ":");
+      finishLoop();
   };
 
 loopScope:
 	'{' {
-	  // addScopeLevel();
+	  addScopeLevel();
     } statement* '}' {
-    // removeScopeLevel();
-    exitMainScope();
-	    returnToBlock = "";
+    removeScopeLevel();
     };
 
 functionDefinition
