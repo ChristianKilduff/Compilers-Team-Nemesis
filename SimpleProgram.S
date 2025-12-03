@@ -24,7 +24,7 @@ main:
 	call print_newline
 	jal end
 ____start______protected___for____0: 
-		li t0, 0 # stores in t0 which may and likely will overide other things
+	li t0, 0 # stores in t0 which may and likely will overide other things
 	call ______protected___for____0
 ______protected___for____0: 
 	li t1, 3

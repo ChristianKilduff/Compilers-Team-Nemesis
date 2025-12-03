@@ -310,7 +310,7 @@ grammar Simple;
 
 
 	  int loop_index = 0;
-	    String returnToBlock = "";
+    String returnToBlock = "";
     void setReturnToMainBlock(String name) {
 	        returnToBlock = name;
     }
@@ -318,6 +318,8 @@ grammar Simple;
     void clearReturnToBlock() {
 	      returnToBlock = "";
     }
+
+	int condition_index = 0;
 }
 prog:
 	{
@@ -771,17 +773,23 @@ conditional_statement
 		)
 	);
 condition
-	returns[String conditional]:
+	returns[String conditional, String condition_sign, String if_true_block, if_false_block]:
 	a = varExprOrType {
-	    $conditional=$a.asText;
+    $conditional=$a.asText;
 } c = conditional_statement {
-if($c.isNot) $conditional = "!(" + $conditional;
-	$conditional += $c.conditionSign;
+    if($c.isNot) $conditional = "!(" + $conditional;
+    $conditional += $c.conditionSign;
 } b = varExprOrType {
 		$conditional+=$b.asText;
     if($c.isNot) $conditional +=")";
     if(isDebug)
-      System.out.println($conditional);
+    System.out.println($conditional);
+
+    $if_true_block = "____PROTECTED_IF_TRUE____" + condition_index;
+    $if_false_block = "____PROTECTED_IF_FALSE____" + condition_index;
+    condition_index++;
+    addCodeToCodeBlock($if_true_block, "");
+    addCodeToCodeBlock($if_false_block, "");
 };
 
 if_statement
@@ -814,7 +822,6 @@ for_statement
 	returns[String repeats, String start_block_name, String loop_block_name, String return_to_main_name]
 		:
 	'repeat' (n = INT | n = VARIABLE_NAME) {
-		    
       $repeats = $n.getText();
       $loop_block_name="______protected___for____" + loop_index++;
       $start_block_name = "____start" + $loop_block_name;
@@ -823,10 +830,9 @@ for_statement
       addCodeLine($return_to_main_name + ":");
 	    
       setScope($loop_block_name);
-    // String i_name = "____protected_index____" + getScopeLevel();
+      // String i_name = "____protected_index____" + getScopeLevel();
 	    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
       addToCodeBlock($start_block_name, "call " + $loop_block_name);
-	    
       
       addToCodeBlock($loop_block_name, "li t1, " + $repeats);
       addToCodeBlock($loop_block_name, "addi t0, t0, 1");
@@ -834,16 +840,35 @@ for_statement
 
 	    returnToBlock = $return_to_main_name;
   } loopScope {
-
       addToCodeBlock($loop_block_name, "call " + $loop_block_name);
   };
 
 while_statement
-	returns[String conditional]:
+	returns[String conditional, String start_block_name, String loop_block_name, String return_to_main_name]
+		:
 	'while' c = condition {
     $conditional = $c.conditional;
-    // addCodeLine("while(" + $conditional + ") {"); //}
-  } loopScope;
+
+    $loop_block_name="______protected___for____" + loop_index++;
+    $start_block_name = "____start" + $loop_block_name;
+    $return_to_main_name = "____return_from" + $loop_block_name;
+    addCodeLine("call "+$loop_block_name);
+    addCodeLine($return_to_main_name + ":");
+    
+    setScope($loop_block_name);
+    // String i_name = "____protected_index____" + getScopeLevel();
+    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
+    addToCodeBlock($start_block_name, "call " + $loop_block_name);
+    
+    addToCodeBlock($loop_block_name, "li t1, " + $repeats);
+    addToCodeBlock($loop_block_name, "addi t0, t0, 1");
+    addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
+
+    returnToBlock = $return_to_main_name;    
+
+  } loopScope {
+      addToCodeBlock($loop_block_name, "call " + $loop_block_name);
+  };
 
 loopScope:
 	'{' {

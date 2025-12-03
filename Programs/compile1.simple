@@ -2,7 +2,7 @@ x=0
 print x
 
 
-repeat 3 {
+while 1 is greater than 2 {
     print 4
     print 7
 }
