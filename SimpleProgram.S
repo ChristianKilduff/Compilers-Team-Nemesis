@@ -27,10 +27,9 @@ ____start______protected___for____0:
 		li t0, 0 # stores in t0 which may and likely will overide other things
 	call ______protected___for____0
 ______protected___for____0: 
-	li t1, 2
+	li t1, 3
 	addi t0, t0, 1
 	bgt t0, t1, ____return_from______protected___for____0
-	call ____return_from______protected___for____0
 	.data
 	pstr1: .asciz "4"
 	.text
@@ -47,6 +46,7 @@ ______protected___for____0:
 	ecall
 
 	call print_newline
+	call ______protected___for____0
 
 print_newline:
 	li    a0, '\n'
