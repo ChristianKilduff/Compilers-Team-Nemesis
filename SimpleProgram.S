@@ -12,6 +12,25 @@ main:
 	ecall
 
 	call print_newline
+	call ______protected___for____0
+	____return_from______protected___for____0:
+	.data
+	pstr3: .asciz "done"
+	.text
+	la    a0, 	pstr3
+	li    a7, 4
+	ecall
+
+	call print_newline
+	jal end
+____start______protected___for____0: 
+		li t0, 0 # stores in t0 which may and likely will overide other things
+	call ______protected___for____0
+____PROTECTED_IF_FALSE____0: 
+	
+______protected___for____0: 
+	addi t0, t0, 1
+	bgt t0, t1, ____return_from______protected___for____0
 	.data
 	pstr1: .asciz "4"
 	.text
@@ -28,15 +47,9 @@ main:
 	ecall
 
 	call print_newline
-	.data
-	pstr3: .asciz "done"
-	.text
-	la    a0, 	pstr3
-	li    a7, 4
-	ecall
-
-	call print_newline
-	jal end
+	call ______protected___for____0
+____PROTECTED_IF_TRUE____0: 
+	
 
 print_newline:
 	li    a0, '\n'

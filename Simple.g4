@@ -773,7 +773,7 @@ conditional_statement
 		)
 	);
 condition
-	returns[String conditional, String condition_sign, String if_true_block, if_false_block]:
+	returns[String conditional, String condition_sign, String if_true_block, String if_false_block]:
 	a = varExprOrType {
     $conditional=$a.asText;
 } c = conditional_statement {
@@ -788,8 +788,8 @@ condition
     $if_true_block = "____PROTECTED_IF_TRUE____" + condition_index;
     $if_false_block = "____PROTECTED_IF_FALSE____" + condition_index;
     condition_index++;
-    addCodeToCodeBlock($if_true_block, "");
-    addCodeToCodeBlock($if_false_block, "");
+    addToCodeBlock($if_true_block, "");
+    addToCodeBlock($if_false_block, "");
 };
 
 if_statement
