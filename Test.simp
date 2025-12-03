@@ -1,14 +1,108 @@
 
-define int t() {
-    return 4 plus 5
+define array merge_sort(array A, int size) {
+
+    is size less than or equal to 1 {
+        return A
+    }
+
+    mid = size divide 2
+
+    left = [0.0]
+    right = [0.0]
+    clear left
+    clear right
+
+    i = 1
+    repeat mid {
+        assign v index i from a
+        add v to left
+        i = i plus 1
+    }
+
+    j = mid plus 1
+    repeat size minus mid {
+        assign v2 index j from a
+        add v2 to right
+        j = j plus 1
+    }
+
+    sorted_left = merge_sort(left, size divide 2)
+    sorted_right = merge_sort(right, size divide 2)
+
+    result = [0.0]
+    clear result
+
+    while True equal to True {
+        ls = 0
+        repeat sorted_left {
+            ls = ls plus 1
+        }
+
+        rs = 0
+        repeat sorted_right {
+            rs = rs plus 1
+        }
+
+        is ls equal to 0 {
+            repeat sorted_right {
+                assign rv index 1 from sorted_right
+                add rv to result
+                remove index 1 from sorted_right
+            }
+            return result
+        }
+
+        is rs equal to 0 {
+            repeat sorted_left {
+                assign lv index 1 from sorted_left
+                add lv to result
+                remove index 1 from sorted_left
+            }
+            return result
+        }
+
+        assign lv2 index 1 from sorted_left
+        assign rv2 index 1 from sorted_right
+
+        is lv2 less than or equal to rv2 {
+            add lv2 to result
+            remove index 1 from sorted_left
+        }
+        if not
+        is lv2 less than or equal to rv2 {
+            add rv2 to result
+            remove index 1 from sorted_right
+        }
+    }
 }
-define int x (int y, int z) {
-    return t()
+n = 0
+print "input number floats to read: "
+input number n
+
+listA=[0.0]
+clear listA
+
+print "input number floats: "
+repeat n {
+    in=0.0
+    input decimal in
+    add in to listA
+
 }
-define void b() {
-    print 4
+
+i=1
+repeat n {
+    assign value index i from listA
+    value = value minus mean
+    add value to listB
+    i = i plus 1
 }
-print "hi"
-y = 5
-z = x(5, 4)
-l = square root y
+
+S = merge_sort(A, n)
+
+k = 1
+repeat S {
+    assign val index k from S
+    print val
+    k = k plus 1
+}

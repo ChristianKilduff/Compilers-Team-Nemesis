@@ -21,7 +21,7 @@ mean = mean divide n
 
 
 
-i=1
+i=0
 repeat n {
     assign value index i from listA
     value = value minus mean
@@ -30,7 +30,7 @@ repeat n {
 }
 
 print "---"
-i=1
+i=0
 repeat n {
     assign v index i from listB
     print v
@@ -39,5 +39,7 @@ repeat n {
 
 print ""
 print "mean: " mean
-print "list A: " listA
-print "list B: " listB
+print "list A: " 
+print listA
+print "list B: " 
+print listB

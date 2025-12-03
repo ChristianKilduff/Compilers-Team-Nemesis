@@ -3,7 +3,7 @@ print "input n: "
 input number n
 
 firstVal = 0.0
-print "input firstVal: "
+print "input firstVal: " inline
 input decimal firstVal
 
 total = firstVal
@@ -26,9 +26,8 @@ i = 1
 
 while i less than n {
     x = 0.0
-    print "input x: "
+    print "input x: " inline
     input decimal x
-    print x
 
     total = total plus x
 
@@ -50,10 +49,16 @@ while i less than n {
     i = i plus 1
 }
 
-print "sum = " total
+print "sum = " inline
+print total 
 
-print "min = " mn
-print "max = " mx
-print "pos = " pos
-print "neg = " neg
-print "zero = " zero
+print "min = " inline
+print mn 
+print "max = " inline
+print mx 
+print "pos = " inline
+print pos 
+print "neg = " inline
+print neg 
+print "zero = " inline
+print zero 

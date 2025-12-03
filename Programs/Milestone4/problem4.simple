@@ -1,19 +1,24 @@
-define void sqrt_newton (double x, int iterations) {
-    distance = 0.0
-    y = 0.0
-    repeat iterations {
-        print "input an end point"
-        input decimal y
-        distance = (x multiply x) plus (y multiply y)
-        distance = square root distance
-        print "distance:"
-        print distance
+define double sqrt_newton (double x, int iterations) {
+    is x less than or equal to 0 {
+        return 0.0
     }
+    g = x
+    i = 0
+    while i less than iterations {
+        g = 0.5 multiply (g plus (x divide g))
+        i = i plus 1
+    }
+    return g
 }
 k = 0
 x = 0.0
-print "input a starting point: "
+y = 0.0
+distance = 0.0
+print "input two points:"
 input decimal x
-print "input the number of iterations"
+input decimal y
+print "input the number of iterations:"
 input number k
-sqrt_newton(x, k)
+distance = sqrt_newton((x multiply x) plus (y multiply y), k)
+print "the distance is:"
+print distance

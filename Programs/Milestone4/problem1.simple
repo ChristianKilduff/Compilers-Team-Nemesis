@@ -1,0 +1,17 @@
+PI = 3.141592653589793
+
+name = ""
+r_str = 3
+input string name
+input number r_str
+
+circumference = 2.0 multiply PI multiply r_str
+area = PI multiply r_str multiply r_str
+
+
+print "Hello, " inline
+print name 
+print "circumference = " inline
+print circumference 
+print "area = " inline
+print area 

@@ -1,108 +1,109 @@
+define void merge(list_double A, int left, int mid, int right, list_double T) {
+    * pointer in left half
+    i = left     
+    * pointer in right half
+    j = mid       
+    * pointer in temp array T
+    k = left      
 
-define array merge_sort(array A, int size) {
 
-    is size less than or equal to 1 {
-        return A
+    while 0 equal to 0 {
+        is i greater than or equal to mid {
+            break
+        }
+        is j greater than or equal to right {
+            break
+        }
+
+        assign Ai index i from A
+        assign Aj index j from A
+        
+
+        is Ai less than or equal to Aj{
+            assign Ai index i from A
+            replace index k with Ai from T
+            i = i plus 1
+        }
+        if not {
+            assign Aj index j from A
+            replace index k with Aj from T
+            j = j plus 1
+        }
+        k = k plus 1
     }
 
-    mid = size divide 2
-
-    left = [0.0]
-    right = [0.0]
-    clear left
-    clear right
-
-    i = 1
-    repeat mid {
-        assign v index i from a
-        add v to left
+    while i less than mid {
+        assign Ai index i from A
+        replace index k with Ai from T
         i = i plus 1
+        k = k plus 1
     }
 
-    j = mid plus 1
-    repeat size minus mid {
-        assign v2 index j from a
-        add v2 to right
+    while j less than right {
+        assign Aj index j from A
+        replace index k with Aj from T
         j = j plus 1
+        k = k plus 1
     }
 
-    sorted_left = merge_sort(left, size divide 2)
-    sorted_right = merge_sort(right, size divide 2)
-
-    result = [0.0]
-    clear result
-
-    while True equal to True {
-        ls = 0
-        repeat sorted_left {
-            ls = ls plus 1
-        }
-
-        rs = 0
-        repeat sorted_right {
-            rs = rs plus 1
-        }
-
-        is ls equal to 0 {
-            repeat sorted_right {
-                assign rv index 1 from sorted_right
-                add rv to result
-                remove index 1 from sorted_right
-            }
-            return result
-        }
-
-        is rs equal to 0 {
-            repeat sorted_left {
-                assign lv index 1 from sorted_left
-                add lv to result
-                remove index 1 from sorted_left
-            }
-            return result
-        }
-
-        assign lv2 index 1 from sorted_left
-        assign rv2 index 1 from sorted_right
-
-        is lv2 less than or equal to rv2 {
-            add lv2 to result
-            remove index 1 from sorted_left
-        }
-        if not
-        is lv2 less than or equal to rv2 {
-            add rv2 to result
-            remove index 1 from sorted_right
-        }
+    * Copy merged range back to A
+    p = left
+    while p less than right {
+        assign Tp index p from T
+        replace index p with Tp from A
+        p = p plus 1
     }
+
 }
+
+define void merge_sort_recursive(list_double A, int left, int right, list_double T) {
+    * Sort A[left:right]. Base case: size 0 or 1
+    
+    rml = right minus left
+    is rml less than or equal to 1 {
+        return
+    }
+    mid = (left plus right) divide 2   * Integer Division by 2
+    merge_sort_recursive(A, left, mid, T)
+    merge_sort_recursive(A, mid, right, T)
+    merge(A, left, mid, right, T)
+}
+
+
 n = 0
-print "input number floats to read: "
+print "input size of array A:"
 input number n
 
-listA=[0.0]
-clear listA
-
-print "input number floats: "
+* Create and fill the array of size n
+A = [0.0]
+clear A
 repeat n {
-    in=0.0
-    input decimal in
-    add in to listA
-
+    add 0.0 to A
 }
 
-i=1
-repeat n {
-    assign value index i from listA
-    value = value minus mean
-    add value to listB
+i = 0
+while i less than n {
+    in = 0.0
+    print "input float: "
+    input decimal in
+    replace index i with in from A
     i = i plus 1
 }
 
-S = merge_sort(A, n)
+* Temp buffer for merging
+T = [0.0]
+clear T
+repeat n {
+    add 0.0 to T
+}
 
-k = 1
-repeat S {
-    assign val index k from S
-    print val
-    k = k plus 1
+print A
+merge_sort_recursive(A, 0, n, T)
+* Output
+i = 0
+
+while i less than n {
+    assign Ai index i from A
+    print Ai
+    i = i plus 1
 }
