@@ -1,8 +1,5 @@
 print "hi"
 repeat 3 {
-    print "outer"
-    repeat 3 {
-        print "inner"
-    }
+    print "loop"
 }
 print "done"
