@@ -1,2 +1,10 @@
+x=0
 print x
-print x
+
+
+repeat 2 {
+    print 4
+    print 7
+}
+
+print "done"
