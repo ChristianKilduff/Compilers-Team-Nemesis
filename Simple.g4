@@ -773,28 +773,53 @@ conditional_statement
 		)
 	);
 condition
-	returns[String a, String b, String if_code, String condition_sign, boolean isNot]:
+	returns[String a, String b, String risc_word, String condition_sign, boolean isNot]:
 	x = varExprOrType {
     $a = $x.asText;
 } c = conditional_statement {
     $isNot = $c.isNot;
     $condition_sign = $c.conditionSign;
+
+    switch($condition_sign) {
+      case ">":
+        $risc_word = "bgt";
+        break;
+      
+      case "<":
+        $risc_word = "blt";
+        break;
+      
+      case "==":
+        if($isNot) {
+          $risc_word = "beq";
+        } else {
+          $risc_word = "bne";
+        }
+        break;
+
+      case ">=":
+        $risc_word = "bge";
+        break;
+      
+      case "<=":
+        $risc_word = "ble";
+        break;
+      
+    }
+
+    System.out.println($condition_sign + " " +$risc_word);
 } y = varExprOrType {
     $b = $y.asText;
 };
 if_statement
-	returns[String a, String b, String if_code, String condition_sign, boolean isNot]:
+	returns[String a, String b, String risc_word, boolean isNot]:
 	'is' c = condition {
     $a = $c.a;
     $b = $c.b;
-    $if_code = $c.if_code;
-    $condition_sign = $c.condition_sign;
+    $risc_word = $c.risc_word;
     $isNot = $c.isNot;
     };
-else_statement:
-	'if not' {
-  // addCodeLine("else");
-};
+else_statement: 'if not';
 
 if_scope:
 	'{' {
@@ -812,10 +837,11 @@ if_else
     $afterBlock = "____AFTER____protected___Conditional____" + $index;
     $elseBlock = "____ELSE____protected___Conditional____" + $index;
 
+
     // TODO condition
     // addCodeLine("li t0, " + $i.a);
     addCodeLine("li t1, " + $i.b);
-    addCodeLine("bgt t0,t1," + $ifBlock);
+    addCodeLine($i.risc_word+" t0,t1," + $ifBlock);
     addCodeLine("call " + $elseBlock);
     addCodeLine($ifBlock + ": ");
 
@@ -824,8 +850,7 @@ if_else
     addCodeLine($elseBlock + ": ");
 
   } (else_statement ifel = if_else)* (
-		e = else_statement is = if_scope {
-    }
+		e = else_statement is = if_scope
 	)? {
     addCodeLine($afterBlock + ": ");
   };
