@@ -28,8 +28,9 @@ ____start______protected___for____0:
 	call ______protected___for____0
 ______protected___for____0: 
 	li t1, 2
-	bgt t0, t1, ____return_from______protected___for____0
 	addi t0, t0, 1
+	bgt t0, t1, ____return_from______protected___for____0
+	call ____return_from______protected___for____0
 	.data
 	pstr1: .asciz "4"
 	.text
@@ -38,7 +39,6 @@ ______protected___for____0:
 	ecall
 
 	call print_newline
-	call ______protected___for____0
 	.data
 	pstr2: .asciz "7"
 	.text
