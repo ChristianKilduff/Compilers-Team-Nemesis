@@ -5,17 +5,15 @@
 
 main:
 	.data
-	x_tmp____protected: .asciz "hello"
-	x: .word x_tmp____protected
+	x: .double 5.5
 	.text
-	.data
-	tmpStr_1: .asciz "hello world"
-	.text
-	la t0,x
-	la t1, tmpStr_1
-	sw t1, (t0)
-	lw a0, x
-	li a7, 4
+	li a7, 7
+	ecall
+	la t0, x
+	fsd fa0 (t0)
+	la t0, x
+	fld fa0, (t0)
+	li a7, 3
 	ecall
 	jal end
 
