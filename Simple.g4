@@ -359,14 +359,44 @@ grammar Simple;
 
 
 	  int loop_index = 0;
-	    String returnToBlock = "";
-    void setReturnToMainBlock(String name) {
-	        returnToBlock = name;
+    void enterLoop(String block_name, String return_name) {
+      loopBlocks.push(block_name);
+      loopReturnBlocks.push(return_name);
     }
 
-    void clearReturnToBlock() {
-	      returnToBlock = "";
+    String getCurrLoopReturn() {
+	      return loopReturnBlocks.peek();
     }
+
+    String finishLoop() {
+      loopBlocks.pop();
+	    return loopReturnBlocks.pop();
+    }
+
+    void addLoopCall() {
+      addCodeLine("call " + loopBlocks.peek());
+    }
+
+    boolean isInLoop() {
+      return !loopReturnBlocks.isEmpty();
+    }
+
+    String getLoop() {
+	      return loopBlocks.peek();
+    }
+
+    String getLoopReturn() {
+        return loopReturnBlocks.peek();
+    }
+
+	int condition_index = 0;
+
+  Stack<String> loopBlocks = new Stack<String>();
+  Stack<String> loopReturnBlocks = new Stack<String>();
+
+  void call(String name) {
+    addCodeLine("call " + name);
+  }
 }
 prog:
 	{
@@ -576,13 +606,13 @@ statement:
 	| condition
 	| output
 	| 'break' {
-      if(!isScopeGlobal() && returnToBlock != "")
-	      addCodeLine("call " + returnToBlock);
+      if(!loopReturnBlocks.empty())
+          call(getCurrLoopReturn());
       
   }
 	| 'continue' {
       if(!isScopeGlobal())
-        addCodeLine("call " + getScope());
+        addLoopCall();
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
 	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
@@ -830,87 +860,141 @@ conditional_statement
 		)
 	);
 condition
-	returns[String conditional]:
-	a = varExprOrType {
-	    $conditional=$a.asText;
+	returns[String a, String b, String risc_word, String condition_sign, boolean isNot]:
+	x = varExprOrType {
+    $a = $x.asText;
 } c = conditional_statement {
-if($c.isNot) $conditional = "!(" + $conditional;
-	$conditional += $c.conditionSign;
-} b = varExprOrType {
-		$conditional+=$b.asText;
-    if($c.isNot) $conditional +=")";
-    if(isDebug)
-      System.out.println($conditional);
-};
+    $isNot = $c.isNot;
+    $condition_sign = $c.conditionSign;
 
+    switch($condition_sign) {
+      case ">":
+        $risc_word = "bgt";
+        break;
+      
+      case "<":
+        $risc_word = "blt";
+        break;
+      
+      case "==":
+        if($isNot) {
+          $risc_word = "beq";
+        } else {
+          $risc_word = "bne";
+        }
+        break;
+
+      case ">=":
+        $risc_word = "bge";
+        break;
+      
+      case "<=":
+        $risc_word = "ble";
+        break;
+      
+    }
+
+    System.out.println($condition_sign + " " +$risc_word);
+} y = varExprOrType {
+    $b = $y.asText;
+};
 if_statement
-	returns[String conditional]:
+	returns[String a, String b, String risc_word, boolean isNot]:
 	'is' c = condition {
-	  $conditional = $c.conditional;
-    // addCodeLine("if(" + $conditional + ")");
-};
-else_statement:
-	'if not' {
-  // addCodeLine("else");
-};
+    $a = $c.a;
+    $b = $c.b;
+    $risc_word = $c.risc_word;
+    $isNot = $c.isNot;
+    };
+else_statement: 'if not';
 
-if_scope
-	returns[ArrayList<String> codeLines]:
+if_scope:
 	'{' {
     addScopeLevel();
-    // addCodeLine("{"); // } – for some reason quoted brackets mess up vscode
-    } statement* '}' {removeScopeLevel();
-    // { – for some reason quoted brackets mess up vscode
-    // addCodeLine("}");
+    } statement* '}' {
+      removeScopeLevel();
     };
 
-if_else:
-	if_statement if_scope (else_statement if_statement if_scope)* (
-		else_statement if_scope
-	)?;
+if_else
+	locals[int index, String ifBlock, String elseBlock, String afterBlock]:
+	i = if_statement {
+    condition_index++;
+    $index = condition_index;
+	  $ifBlock = "____IF____protected___Conditional____" + $index;
+    $afterBlock = "____AFTER____protected___Conditional____" + $index;
+    $elseBlock = "____ELSE____protected___Conditional____" + $index;
+
+
+    // TODO condition values (rn just using t0 ? t1)
+    // addCodeLine("li t0, " + $i.a);
+    addCodeLine("li t1, " + $i.b);
+    addCodeLine($i.risc_word+" t0,t1," + $ifBlock);
+    addCodeLine("call " + $elseBlock);
+    addCodeLine($ifBlock + ": ");
+
+  } is = if_scope {
+    addCodeLine("call " + $afterBlock);
+    addCodeLine($elseBlock + ": ");
+
+  } (else_statement ifel = if_else)* (
+		e = else_statement is = if_scope
+	)? {
+    addCodeLine($afterBlock + ": ");
+  };
 
 for_statement
-	returns[String repeats, String start_block_name, String loop_block_name, String return_to_main_name]
+	returns[String repeats, String start_block_name, String loop_block_name, String return_to_block]
 		:
 	'repeat' (n = INT | n = VARIABLE_NAME) {
-		    
       $repeats = $n.getText();
-      $loop_block_name="______protected___for____" + loop_index++;
+      $loop_block_name="______protected___loop____" + loop_index++;
       $start_block_name = "____start" + $loop_block_name;
-      $return_to_main_name = "____return_from" + $loop_block_name;
-      addCodeLine("call "+$loop_block_name);
-      addCodeLine($return_to_main_name + ":");
-	    
-      setScope($loop_block_name);
-    // String i_name = "____protected_index____" + getScopeLevel();
-	    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
-      addToCodeBlock($start_block_name, "call " + $loop_block_name);
-	    
+      $return_to_block = "____return_from" + $loop_block_name;
+
+      enterLoop($loop_block_name, $return_to_block);
+
+      call($loop_block_name);
+      addCodeLine($start_block_name + ": ");
+	    addCodeLine("\tli t0, 0 # stores in t0 which may and likely will overide other things");
+      call($loop_block_name);
       
-      addToCodeBlock($loop_block_name, "li t1, " + $repeats);
-      addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-      addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
-
-	    returnToBlock = $return_to_main_name;
+      addCodeLine($loop_block_name + ":");
+      addCodeLine("li t1, " + $repeats);
+      addCodeLine("addi t0, t0, 1");
+      addCodeLine("bgt t0, t1, "+ $return_to_block);
   } loopScope {
-
-      addToCodeBlock($loop_block_name, "call " + $loop_block_name);
+      addLoopCall();
+      addCodeLine($return_to_block + ":");
+      finishLoop();
   };
 
 while_statement
-	returns[String conditional]:
+	returns[String conditional, String loop_block_name, String return_to_block]:
 	'while' c = condition {
-    $conditional = $c.conditional;
-    // addCodeLine("while(" + $conditional + ") {"); //}
-  } loopScope;
+    $loop_block_name="______protected___loop____" + loop_index++;
+    $return_to_block = "____return_from" + $loop_block_name;
+
+    enterLoop($loop_block_name, $return_to_block);
+    addCodeLine("call "+$loop_block_name);
+    // addCodeLine()
+
+    
+    addCodeLine("addi t0, t0, 1");
+    addCodeLine("bgt t0, t1, "+ $return_to_block);
+
+    
+
+  } loopScope {
+      addLoopCall();
+      addCodeLine($return_to_block + ":");
+      finishLoop();
+  };
 
 loopScope:
 	'{' {
-	  // addScopeLevel();
+	  addScopeLevel();
     } statement* '}' {
-    // removeScopeLevel();
-    exitMainScope();
-	    returnToBlock = "";
+    removeScopeLevel();
     };
 
 functionDefinition
