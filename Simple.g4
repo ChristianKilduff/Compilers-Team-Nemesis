@@ -965,7 +965,8 @@ condition
     $b = $y.getText();
 };
 if_statement
-	returns[String a, String b, String leftType, String rightType, String risc_word, boolean isNot]:
+	returns[String a, String b, String leftType, String rightType, String risc_word, boolean isNot, boolean failed]
+		:
 	i = 'is' c = condition {
     $a = $c.a;
     $b = $c.b;
@@ -974,16 +975,24 @@ if_statement
     $risc_word = $c.risc_word;
     $isNot = $c.isNot;
 
-
     String lSubT = $leftType;
     String rSubT = $rightType;
     if($leftType.equals(Types.VARIABLE)) {
       lSubT = getVariable($a).type;
+      if(!(lSubT.equals(Types.DOUBLE) || lSubT.equals(Types.INT))) {
+	        $failed = true;
+	        error($i, " conditionals can only compare ints and decimals");
+      } 
     }
     if($rightType.equals(Types.VARIABLE)) {
       rSubT = getVariable($b).type;
+        if(!(rSubT.equals(Types.DOUBLE) || rSubT.equals(Types.INT))) {
+          $failed = true;
+	        error($i, " conditionals can only compare ints and decimals");
+      } 
     }
     if(!lSubT.equals(rSubT)) {
+      $failed = true;
       error($i, " conditionals can only compare variables or constants of the same exact type");
     }
     };
@@ -999,17 +1008,19 @@ if_scope:
 if_else
 	locals[int index, String ifBlock, String elseBlock, String afterBlock]:
 	i = if_statement {
-    condition_index++;
-    $index = condition_index;
-	  $ifBlock = "____IF____protected___Conditional____" + $index;
-    $afterBlock = "____AFTER____protected___Conditional____" + $index;
-    $elseBlock = "____ELSE____protected___Conditional____" + $index;
+	    if(!$i.failed) {
+        condition_index++;
+        $index = condition_index;
+        $ifBlock = "____IF____protected___Conditional____" + $index;
+        $afterBlock = "____AFTER____protected___Conditional____" + $index;
+        $elseBlock = "____ELSE____protected___Conditional____" + $index;
 
 
 
-    genConditionalCode($i.a, $i.b, $i.leftType, $i.rightType, $i.risc_word, $ifBlock);
-    addCodeLine("call " + $elseBlock);
-    addCodeLine($ifBlock + ": ");
+        genConditionalCode($i.a, $i.b, $i.leftType, $i.rightType, $i.risc_word, $ifBlock);
+        addCodeLine("call " + $elseBlock);
+        addCodeLine($ifBlock + ": ");
+      }
 
   } is = if_scope {
     addCodeLine("call " + $afterBlock);
