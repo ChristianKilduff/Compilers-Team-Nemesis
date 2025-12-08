@@ -5,29 +5,28 @@
 
 main:
 	.data
-	x: .word 3
+	____ARRAY0____ELEMENT____0: .word 1
 	.text
 	.data
-	y: .word 3
+	____ARRAY0____ELEMENT____1: .word 2
 	.text
-	___CHECK______protected___loop____0:
-	la t0, x
-	lw t0, (t0)
-	la t1, y
-	lw t1, (t1)
-	bge t0, t1, ______protected___loop____0
-	call ____return_from______protected___loop____0
-	______protected___loop____0: 
 	.data
-	pstr0: .asciz "looping"
+	____ARRAY0____ELEMENT____2: .word 3
 	.text
-	la    a0, 	pstr0
-	li    a7, 4
+	.data
+	x: .word 4
+	.text
+	.data
+	____ARRAY0____ELEMENT____3: .word 1
+	.text
+	.data
+	l: .word 3
+	.text
+	la t1, l
+	lw t2, 0(t1)
+	addi a0, t2, 0
+	li    a7, 1
 	ecall
-
-	call print_newline
-	call ___CHECK______protected___loop____0
-	____return_from______protected___loop____0:
 	jal end
 
 print_newline:

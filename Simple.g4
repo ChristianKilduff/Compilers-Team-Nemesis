@@ -216,7 +216,67 @@ grammar Simple;
       return null;
   }
 
-  
+
+  Map<String, RiscArray> ARRAYS = new HashMap();
+
+  RiscArray generateArray(String name, String type, String ... values) {
+      RiscArray arr  = new RiscArray(type);
+      ARRAYS.put(name, arr);
+      for(String v : values) {
+        arr.add(v);
+      }
+
+      return arr;
+  }
+
+  int array_count = 0;
+  class RiscArray {
+    ArrayList<String> variables = new ArrayList<String>();;
+    int c = array_count++;
+    int i = 0;
+    String type;
+
+    public RiscArray(String type) {
+      this.type = type;
+    }
+
+    void add(String value) {
+      String varName = "____ARRAY" + c + "____ELEMENT____" + i;
+      i++;
+      variables.add(varName);
+
+      if(type.equals(Types.INT)) {
+        generateIntAssign(varName, value);
+      } else if(type.equals(Types.DOUBLE)) {
+        generateDoubleAssign(varName, value);
+      } else if(type.equals(Types.STRING)) {
+        generateStringAssign(varName, value);
+      }
+    }
+
+    int size() {
+      return this.variables.size();
+    }
+
+    void set(int index, String value) {
+      String varName = variables.get(index);
+	      if(type.equals(Types.INT)) {
+        reassignInt(varName, value);
+      } else if(type.equals(Types.DOUBLE)) {
+        reassignDouble(varName, value);
+      } else if(type.equals(Types.STRING)) {
+        reassignString(varName, value);
+      }
+    }
+
+    void remove(int index) {
+      variables.remove(index);
+    }
+
+    void clear() {
+      variables.clear();
+    }
+  }
 
   boolean doesVariableExist(String varName) {
     return getVariable(varName) != null;
@@ -576,7 +636,7 @@ assignment
                 } else if($typeOf.equals(Types.STRING)) {
                   generateStringAssign($name.getText(), $value);
 	              } else if($typeOf.equals(Types.ARRAY)) {
-                 
+	                  generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
                 }
 
           } else { // if already exists then reassign
@@ -704,40 +764,85 @@ statement:
 
 clear_array:
 	'clear ' n = VARIABLE_NAME {
-  // addCodeLine($n.getText() + ".clear();");
+  ARRAYS.get($n.getText()).clear();
 };
 append_to_array:
 	'add ' v = varExprOrType ' to ' n = VARIABLE_NAME {
-  // addCodeLine($n.getText() + ".add(" + $v.asText + ");");
+    RiscArray arr = ARRAYS.get($n.getText());
+    if(arr == null) {
+      error($n, "Error array does not exist");
+    } else {
+    if($v.typeOf.equals(Types.VARIABLE) | $v.isExpression) {
+      Identifier var = getVariable($v.asText);
+      if(!var.type.equals(arr.type)) {
+        error($n, "var type does not match array type");
+        } else {
+          // TODO add variable value to array
+        }
+      } else if(!$v.typeOf.equals(arr.type)) {
+        error($n, "type of array does not match input");
+      } else {
+        arr.add($v.asText);
+      }
+    }
 };
 
 array_length:
 	'assign ' v = VARIABLE_NAME ' length of ' n = VARIABLE_NAME {
-	    // addCodeLine($v.getText() + "=" + $n.getText() + ".size();");
+      Identifier var = getVariable($v.getText());
+      if(ARRAYS.get($n.getText()) == null) {
+        error($n, "Error array does not exist");
+      } else if(var == null) {
+          int size = ARRAYS.get($n.getText()).size();
+          createVariable($v.getText(), size+"", Types.INT);
+          generateIntAssign($v.getText(), size+"");
+      } else if(var.type != Types.INT) {
+        error($v, "Can only assign length of array to an int");
+      }else {
+            int size = ARRAYS.get($n.getText()).size();
+            reassignInt($v.getText(), size+"");
+      }
   };
 replace_index_array
-	locals[String index_code]:
+	locals[int index]:
 	'replace index ' (
 		i = INT {
-		      $index_code = "" + (Integer.parseInt($i.getText()) - 1);
+		      $index = Integer.parseInt($i.getText()) - 1;
 	  }
 		| i_v = VARIABLE_NAME {
-	      $index_code = $i_v.getText();
+	      // TODO
     }
-	) ' with ' v = VARIABLE_NAME ' from ' l = VARIABLE_NAME {
-	  // addCodeLine($l.getText() + ".set(" + $index_code + ", " + $v.getText() + ");");
+	) ' with ' v = VARIABLE_NAME ' from ' n = VARIABLE_NAME {
+    RiscArray arr = ARRAYS.get($n.getText());
+   
+    if(arr == null) {
+      error($n, "Error array does not exist");
+    } else if($index >= arr.size() || $index < 0) {
+        error($n, "Index out of bounds");
+    } else {
+      // TODO set it to the variable
+      arr.set($index, "test");
+    }
 };
 remove_from_array
-	locals[String index_code]:
+	locals[String index_code, int index]:
 	'remove index ' (
 		i = INT {
-		      $index_code = "" + (Integer.parseInt($i.getText()) - 1);
-	  }
-		| i_v = VARIABLE_NAME {
-	      $index_code = $i_v.getText();
+      int index = Integer.parseInt($i.getText()) - 1;
     }
+		| v = VARIABLE_NAME {
+    // TODO
+  }
 	) ' from ' n = VARIABLE_NAME {
-	  // addCodeLine($n.getText() + ".remove(" + $index_code + ");");
+    RiscArray arr = ARRAYS.get($n.getText());
+   
+    if(arr == null) {
+      error($n, "Error array does not exist");
+    } else if($index >= arr.size() || $index < 0) {
+        error($n, "Index out of bounds");
+    } else {
+      arr.remove($index);
+    }
 };
 
 get_from_array
@@ -781,8 +886,10 @@ square_root
       $hasKnownValue = $e.hasKnownValue;
     };
 expr
-	returns[boolean hasKnownValue, float value, String exprString, String typeOf]:
+	returns[boolean hasKnownValue, float value, String exprString, String typeOf, boolean isExpression]
+		:
 	a = word {
+	    $isExpression = $a.isExpression;
       $exprString = $a.exprString;
       $typeOf = $a.isDouble ? Types.DOUBLE : Types.INT;
       if ($a.hasKnownValue) {
@@ -807,11 +914,13 @@ expr
             $value = $value - $b.value;
           addCodeLine($exprString + "    fsub.d   ft0, ft0  ft1");
         }
+	  $isExpression = true;
     }
 	)*;
 
 word
-	returns[boolean hasKnownValue, float value, String exprString, boolean isDouble]:
+	returns[boolean hasKnownValue, float value, String exprString, boolean isDouble, boolean isExpression]
+		:
 	a = factor {
       $exprString = $a.factorString;
       $isDouble = $a.isDouble;
@@ -846,6 +955,8 @@ word
         } else {
           $hasKnownValue = false;
         }
+
+	        $isExpression = true;
       }
 	)*;
 
@@ -1405,7 +1516,7 @@ output
   };
 
 varExprOrType
-	returns[String asText, String typeOf]:
+	returns[String asText, String typeOf, boolean isExpression]:
 	(
 		t = VARIABLE_NAME {$typeOf=Types.VARIABLE;}
 		| t = STRING {$typeOf=Types.STRING;}
@@ -1415,6 +1526,7 @@ varExprOrType
   }
 	| e = expr {
       $typeOf=$e.typeOf;
+      $isExpression = $e.isExpression;
 	    $asText = $e.exprString;
   }
 	| f = functionCall {

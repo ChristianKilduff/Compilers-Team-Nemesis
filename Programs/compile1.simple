@@ -1,6 +1,8 @@
-x = 3
-y = 3
+list=[1,2,3]
+x=4
 
-while x greater than or equal to y {
-    print "looping"
-}
+add 1 to list
+remove index 1 from list
+assign l length of list
+
+print l
