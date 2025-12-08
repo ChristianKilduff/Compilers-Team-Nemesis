@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .text
 .globl main
 .globl end
@@ -50,3 +51,5 @@ end:
 	li    a0, 0     # Load the exit code (e.g., 0 for success) into a0
 	li    a7, 93    # Load the Exit2 syscall number into a7
 	ecall        # Execute the system call to exit
+=======
+>>>>>>> f421256cd8f2801c65ed1bba0182e42320fc5a37

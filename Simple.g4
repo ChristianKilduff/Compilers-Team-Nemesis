@@ -272,20 +272,27 @@ grammar Simple;
     addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
   }
   void generateIntAssign(String name, String value) {
-    // tempRegister is either t0 or t1 (if t0 is taken)
-    //String tempRegister = register.equals("t0") ? "t1" : "t0";
-    String s = ".data\n"+
-          "    VAL" + data_count + ": .double "+value+"\n"
-          + "    IDX" + name + ": .double 0.0\n"+"    .text";
+    String s = ".data\n"
+      + "\t" + name + ": .word " + value
+      +"\n\t.text";
     addCodeLine(s);
-    data_count++;
-    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+    // data_count++;
+    // addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
+    // addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+    // addCodeLine("la " + " t0" + "," + "IDX"+name);
+    // addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
+    // addCodeLine("la " + " t0" + "," + "IDX"+name);
+    // addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
   }
+  void reassignInt(String varName, String value) {
+    // set t0 to the value wanted
+    addCodeLine("li t0, " + value);
+    // t1 = address of var
+    addCodeLine("la t1, " + varName);
+    addCodeLine("sw t0 0(t1)");
+  }
+
+
   void generateStringAssign(String name, String value) {
     // tempRegister is either t0 or t1 (if t0 is taken)
     //String tempRegister = register.equals("t0") ? "t1" : "t0";
@@ -483,59 +490,38 @@ assignment
 
                 String assignmentString = "";
                 if($typeOf.equals(Types.DOUBLE)) {
-                    //assignmentString = "double ";
+                  generateDoubleAssign($name.getText(), $value);
 		            } else if($typeOf.equals(Types.BOOL)) {
-                    assignmentString = "boolean ";
+                  
                 }
                 else if($typeOf.equals(Types.INT)) {
-                    assignmentString = "int ";
-                } else if($typeOf.equals(Types.STRING)) {
-                    assignmentString = "String ";
-	              } else if($typeOf.equals(Types.ARRAY)) {
-                  assignmentString = "ArrayList<" + $a.javaType +"> ";
-                  newID.arrayType = $a.typeOf;
-                  if(isDebug)
-                    System.out.println(">>Array type: " +  newID.arrayType);
-                    assignmentString += newID.id + "= new ArrayList<" + $a.javaType + ">();";
-
-                  // addCodeLine(assignmentString);
-		              String appendString = "Collections.addAll("+newID.id+", new "+ $a.javaType +"[]{";
-                  // add values
-                  boolean isFirst = true;
-                  for(String v : $a.values) {
-                    if(isFirst) {
-                      isFirst=false;
-                      appendString += v;
-                      continue;
-                    } else {
-	                    appendString += "," + v;
-                    }
-                  }
-                  appendString+="});";
-                  // addCodeLine(appendString);
-
-                }
-              if(!$typeOf.equals(Types.ARRAY)){
-                assignmentString += $name.getText() + "=" + $value + ";";
-                  if($typeOf.equals(Types.DOUBLE)) {
-                  generateDoubleAssign($name.getText(), $value);
-                  // addCodeLine(assignmentString);
-                } else if($typeOf.equals(Types.INT)) {
                   generateIntAssign($name.getText(), $value);
-                  // addCodeLine(assignmentString);
                 } else if($typeOf.equals(Types.STRING)) {
                   generateStringAssign($name.getText(), $value);
-                  // addCodeLine(assignmentString);
+	              } else if($typeOf.equals(Types.ARRAY)) {
+                 
                 }
-            }
 
           } else { // if already exists then reassign
-	              if($typeOf.equals(Types.ARRAY)){
+		            if($typeOf.equals(Types.DOUBLE)) {
+                
+		            } else if($typeOf.equals(Types.BOOL)) {
+                  
+                }
+                else if($typeOf.equals(Types.INT)) {
+	                    String reAssignCode = "li t0, " + $value
+                      +"\n\tla t1, " + $name.getText()
+                      +"\n\tsw t0, 0(t1)";
+
+                      addCodeLine(reAssignCode);
+                } else if($typeOf.equals(Types.STRING)) {
+                
+	              } else if($typeOf.equals(Types.ARRAY)) {
+                 
+                }
+                else if($typeOf.equals(Types.ARRAY)){
 	                error($name,"Cannot reassign arrays");
                 }
-              newID.value = $value;
-              // addCodeLine(newID.id + "=" + $value + ";");
-
           }
       if(isDebug)
         System.out.println("Assigning | name: " + newID.id + " | value: " + newID.value + " | scope: " + newID.scope + " | Level: " + newID.scopeLevel + " | type: " + newID.type);
@@ -1213,7 +1199,7 @@ input_decimal:
 };
 
 printType
-	returns[Boolean hasKnownValue, String value, String code]:
+	returns[Boolean hasKnownValue, String value, String code, boolean isVar]:
 	INT {
     $hasKnownValue = true; 
     $value = $INT.getText();
@@ -1222,6 +1208,7 @@ printType
 	| DECIMAL {$hasKnownValue = true; 
   $value = $DECIMAL.getText();
 		  // $code = "System.out.println(" + $value + ");";
+
   }
 	| STRING {$hasKnownValue = true; 
     $value = $STRING.getText();
@@ -1231,15 +1218,27 @@ printType
     $code = "System.out.println("+$value+");";
     }
 	| VARIABLE_NAME {
-        String id = $VARIABLE_NAME.getText();
-        used.add(id);
-	      $value=id;
+      $isVar = true;
+        Identifier id = getVariable($VARIABLE_NAME.getText());
+        used.add(id.id);
         // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
-        if (!doesVariableExist(id)) {
+        if (id == null) {
           // General use-before-assign.
-          error($VARIABLE_NAME, "use of variable '" + id + "' before assignment");
+	          error($VARIABLE_NAME, "use of variable '" + $VARIABLE_NAME.getText() + "' before assignment");
         } else{
-            // $code = "System.out.println(" + id + ");";
+          // var exists
+          $value=id.id;
+          if(id.type.equals(Types.INT)) {
+              String loadStr = "la t1, " + id.id
+              +"\n\tlw t2, 0(t1)";
+
+              String printIntStr= "addi a0, t2, 0"
+              +"\n\tli    a7, 1"
+              +"\n\tecall";
+
+              addCodeLine(loadStr);
+              addCodeLine(printIntStr);
+          }
         }
         $hasKnownValue = false;
       }
@@ -1254,15 +1253,17 @@ output
 	(
 		'print' v = printType (
 			'inline' {
-    $inline=true;
+      $inline=true;
   }
 		)?
 	) {
-    if($inline) {
-        addPrintLine($v.value);
-    } else {
-        addPrintLine($v.value);
-        addPrintNewLine();
+    if(!$v.isVar) {
+      if($inline) {
+          addPrintLine($v.value);
+      } else {
+          addPrintLine($v.value);
+          addPrintNewLine();
+      }
     }
   };
 
