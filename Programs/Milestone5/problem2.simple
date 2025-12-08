@@ -18,7 +18,11 @@ is income less than 10000{
 tax = (rate divide 100) multiply income
 net = income minus tax
 
-print "income " income
-print "rate " rate
-print "tax = " tax
-print "net = " net
+print "income " inline
+print income
+print "rate " inline
+print rate
+print "tax = " inline
+print tax
+print "net = " inline
+print net
