@@ -324,6 +324,12 @@ grammar Simple;
     addCodeLine("sw t1, (t0)");
   }
 
+  String generateLoadId (String id) {
+    String code = "";
+    code += "la t0, " + id + "\n";
+    code += "    fld " + "ft0" + ",(t0)" + "\n";
+    return code;
+  }
 
   void emit(String s) {sb.append(s);}  
   //File generation
@@ -738,13 +744,15 @@ expr
         $typeOf = Types.DOUBLE;
       }
         if ($op.getText().equals("plus")) {
-		      $exprString += " + " + $b.exprString;
+		      $exprString += $b.exprString;
           if ($hasKnownValue && $b.hasKnownValue)
             $value = $value + $b.value;
+          addCodeLine($exprString + "    fadd.d   ft0, ft0  ft1");
         } else {
-		        $exprString += " - " + $b.exprString;
+		        $exprString += $b.exprString;
           if ($hasKnownValue && $b.hasKnownValue)
             $value = $value - $b.value;
+          addCodeLine($exprString + "    fsub.d   ft0, ft0  ft1");
         }
     }
 	)*;
@@ -761,9 +769,11 @@ word
     } (
 		op = ('multiply' | 'divide' | 'mod') b = factor {
         if($op.getText().equals("divide")) {
-              $exprString += " / " + $b.factorString;
+              $exprString += $b.factorString;
+              addCodeLine($exprString + "    fdiv.d   ft0, ft0  ft1");
 	        } else if($op.getText().equals("multiply")) {
-              $exprString += " * " + $b.factorString;
+              $exprString += $b.factorString;
+              addCodeLine($exprString + "    fmul.d   ft0, ft0  ft1");
 	        } else if($op.getText().equals("mod")) {
               $exprString +=" % " + $b.factorString;
         } 
@@ -797,11 +807,11 @@ factor
 	  $isDouble = true;
     $hasKnownValue = true; 
     $value = Float.parseFloat($DECIMAL.getText());
-		    $factorString = ""+$DECIMAL.getText();
+		$factorString = ""+$DECIMAL.getText();
     }
 	| VARIABLE_NAME {
         String id = $VARIABLE_NAME.getText();
-	      $factorString=id;
+	      $factorString = generateLoadId(id);
         used.add(id);
         // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
         if (!doesVariableExist(id)) {
