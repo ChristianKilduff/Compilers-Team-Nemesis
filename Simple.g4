@@ -257,32 +257,37 @@ grammar Simple;
   
 
   void generateDoubleAssign(String name, String value) {
-    // tempRegister is either t0 or t1 (if t0 is taken)
-    //String tempRegister = register.equals("t0") ? "t1" : "t0";
-    String s = ".data\n"+
-          "    VAL" + data_count + ": .double "+value+"\n"
-          + "    IDX" + name + ": .double 0.0\n"+"    .text";
+    String s = ".data"
+    +"\n\t" + name  + ": .double "+value
+    +"\n\t.text";
     addCodeLine(s);
-    data_count++;
-    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+
+
+  }
+
+
+  void reassignDouble(String name, String value) {
+	    String dName="DOUBLE_" + data_count;
+      data_count++;
+      String new_double = ".data"
+      + "\n\t" + dName + ": .double " + value
+      +"\n\t.text";
+
+      addCodeLine(new_double);
+
+	
+    addCodeLine("la " + " t0" + "," + dName);
+    addCodeLine("fld  fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fsd fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fld fa0, (t0)");
   }
   void generateIntAssign(String name, String value) {
     String s = ".data\n"
       + "\t" + name + ": .word " + value
       +"\n\t.text";
     addCodeLine(s);
-    // data_count++;
-    // addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    // addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    // addCodeLine("la " + " t0" + "," + "IDX"+name);
-    // addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    // addCodeLine("la " + " t0" + "," + "IDX"+name);
-    // addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
   }
   void reassignInt(String varName, String value) {
     // set t0 to the value wanted
@@ -504,7 +509,7 @@ assignment
 
           } else { // if already exists then reassign
 		            if($typeOf.equals(Types.DOUBLE)) {
-                
+                  reassignDouble($name.getText(), $value);
 		            } else if($typeOf.equals(Types.BOOL)) {
                   
                 }
@@ -1238,6 +1243,13 @@ printType
 
               addCodeLine(loadStr);
               addCodeLine(printIntStr);
+          } else if(id.type.equals(Types.DOUBLE)) {
+            String printDouble = "la t0, x"
+            + "\n\tfld fa0, (t0)"
+            + "\n\tli a7, 3"
+            + "\n\tecall";
+
+            addCodeLine(printDouble);
           }
         }
         $hasKnownValue = false;
