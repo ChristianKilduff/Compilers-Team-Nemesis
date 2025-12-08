@@ -5,9 +5,16 @@
 
 main:
 	.data
-	x: .asciz "hello"
+	x_tmp____protected: .asciz "hello"
+	x: .word x_tmp____protected
 	.text
-	la a0, x
+	.data
+	tmpStr_1: .asciz "hello world"
+	.text
+	la t0,x
+	la t1, tmpStr_1
+	sw t1, (t0)
+	lw a0, x
 	li a7, 4
 	ecall
 	jal end

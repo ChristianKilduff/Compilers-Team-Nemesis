@@ -299,30 +299,32 @@ grammar Simple;
 
 
   void generateStringAssign(String name, String value) {
-      String s = ".data" 
-	    +"\n\t" + name +": .asciz " + value
+    String tmpN = name + "_tmp____protected";
+    String s = ".data" 
+		  + "\n\t" + tmpN + ": .asciz " + value
+      + "\n\t" + name + ": .word " + tmpN
 	    +"\n\t.text";
-
     addCodeLine(s);
-    
   }
 
   void reassignString(String name, String value) {
     data_count++;
     String tmpName = "tmpStr_" + data_count;
     String s = ".data" 
-	    +"\n\t" + tmpName +": .asciz \"" + value +"\""
+	    +"\n\t" + tmpName +": .asciz " + value +""
 	    +"\n\t.text";
 
     addCodeLine(s);
     data_count++;
+
 	
-    addCodeLine("la t0," + tmpName);
-    addCodeLine("fld  fa0, (t0)");
-    addCodeLine("la t0, " + name);
-    addCodeLine("fsd fa0, (t0)");
-    addCodeLine("la t0, " + name);
-    addCodeLine("fld fa0, (t0)");
+    // la t0, name
+    // la t1, tmpN
+    // sd t1, (t0)
+
+    addCodeLine("la t0," + name);
+    addCodeLine("la t1, " + tmpName);
+    addCodeLine("sw t1, (t0)");
   }
 
 
@@ -1264,7 +1266,7 @@ printType
 
             addCodeLine(printDouble);
           } else if(id.type.equals(Types.STRING)) {
-            addCodeLine("la a0, " + id.id);
+            addCodeLine("lw a0, " + id.id);
             
             String printStr = "li a7, 4"
             + "\n\tecall";
