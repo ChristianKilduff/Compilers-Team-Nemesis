@@ -919,9 +919,12 @@ conditional_statement
 condition
 	returns[String a, String b, String leftType, String rightType, String risc_word, String condition_sign, boolean isNot]
 		:
-	x = varExprOrType {
-    $a = $x.asText;
-    $leftType = $x.typeOf;
+	(
+		x = INT {$leftType = Types.INT;}
+		| x = DECIMAL {$leftType = Types.DOUBLE;}
+		| x = VARIABLE_NAME {$leftType = Types.VARIABLE;}
+	) {
+    $a = $x.getText();
 } c = conditional_statement {
     $isNot = $c.isNot;
     $condition_sign = $c.conditionSign;
@@ -954,9 +957,12 @@ condition
     }
 
     System.out.println($condition_sign + " " +$risc_word);
-} y = varExprOrType {
-    $b = $y.asText;
-    $rightType = $y.typeOf;
+} (
+		y = INT {$rightType = Types.INT;}
+		| y = DECIMAL {$rightType = Types.DOUBLE;}
+		| y = VARIABLE_NAME {$rightType = Types.VARIABLE;}
+	) {
+    $b = $y.getText();
 };
 if_statement
 	returns[String a, String b, String leftType, String rightType, String risc_word, boolean isNot]:
