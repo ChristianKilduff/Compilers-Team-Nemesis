@@ -5,34 +5,14 @@
 
 main:
 	.data
-	pstr0: .asciz "x"
+	pstr0: .asciz "Hello, "
 	.text
 	la    a0, 	pstr0
 	li    a7, 4
 	ecall
 
-	call print_newline
-	call ______protected___for____0
-	____return_from______protected___for____0:
 	.data
-	pstr3: .asciz "done"
-	.text
-	la    a0, 	pstr3
-	li    a7, 4
-	ecall
-
-	call print_newline
-	jal end
-____start______protected___for____0: 
-		li t0, 0 # stores in t0 which may and likely will overide other things
-	call ______protected___for____0
-______protected___for____0: 
-	li t1, 2
-	addi t0, t0, 1
-	bgt t0, t1, ____return_from______protected___for____0
-	call ____return_from______protected___for____0
-	.data
-	pstr1: .asciz "4"
+	pstr1: .asciz "name"
 	.text
 	la    a0, 	pstr1
 	li    a7, 4
@@ -40,13 +20,22 @@ ______protected___for____0:
 
 	call print_newline
 	.data
-	pstr2: .asciz "7"
+	pstr2: .asciz "total = "
 	.text
 	la    a0, 	pstr2
 	li    a7, 4
 	ecall
 
 	call print_newline
+	.data
+	pstr3: .asciz "savings = "
+	.text
+	la    a0, 	pstr3
+	li    a7, 4
+	ecall
+
+	call print_newline
+	jal end
 
 print_newline:
 	li    a0, '\n'
