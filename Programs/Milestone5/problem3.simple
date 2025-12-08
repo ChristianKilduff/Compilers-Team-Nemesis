@@ -3,7 +3,7 @@ n = 0
 input number n
 
 steps = 0
-max_val = 0
+max_val = n
 
 while n not equal to 1{
     is n greater than max_val{
@@ -23,5 +23,7 @@ is n greater than max_val{
     max_val = n
 }
 
-print "steps = " steps
-print "max = " max_val
+print "steps = " inline
+print steps
+print "max = " inline
+print max_val
