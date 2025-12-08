@@ -5,13 +5,16 @@
 
 main:
 	.data
-	pstr0: .asciz "1.0"
+	x: .double 5.5
 	.text
-	la    a0, 	pstr0
-	li    a7, 4
+	li a7, 7
 	ecall
-
-	call print_newline
+	la t0, x
+	fsd fa0 (t0)
+	la t0, x
+	fld fa0, (t0)
+	li a7, 3
+	ecall
 	jal end
 
 print_newline:

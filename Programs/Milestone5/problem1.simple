@@ -15,5 +15,7 @@ savings = income minus total
 
 print "Hello, " inline
 print name
-print "total = " total
-print "savings = " savings
+print "total = " inline
+print total
+print "savings = " inline
+print savings

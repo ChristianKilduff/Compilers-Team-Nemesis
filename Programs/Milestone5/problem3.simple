@@ -1,0 +1,27 @@
+n = 0
+
+input number n
+
+steps = 0
+max_val = 0
+
+while n not equal to 1{
+    is n greater than max_val{
+        max_val = n
+    }
+
+    is n mod 2 equal to 0{
+        n = n divide 2
+    } if not{
+        n = 3 multiply n plus 1
+    }
+
+    steps = steps plus 1
+}
+
+is n greater than max_val{
+    max_val = n
+}
+
+print "steps = " steps
+print "max = " max_val
