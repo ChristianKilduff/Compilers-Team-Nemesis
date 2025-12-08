@@ -1,5 +1,5 @@
-print "hi"
-repeat 3 {
-    print "loop"
-}
-print "done"
+x=3
+
+x=4
+
+print x
