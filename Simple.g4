@@ -221,6 +221,7 @@ grammar Simple;
     return getVariable(varName) != null;
   }
 
+
   /** Variables that appear in any expression or print (i.e., used). */
   Set<String> used = new HashSet<>();
 
@@ -249,10 +250,58 @@ grammar Simple;
   }
   //Code generation
   StringBuilder sb = new StringBuilder();
+  //StringBuilder dataSb = new StringBuilder();
   StringBuilder sb2 = new StringBuilder();
+  int data_count = 0;
+  String CONST_PREFIX = "VAL";
   
-  
-  void emit(String s) {sb.append(s);}   
+
+  void generateDoubleAssign(String name, String value) {
+    // tempRegister is either t0 or t1 (if t0 is taken)
+    //String tempRegister = register.equals("t0") ? "t1" : "t0";
+    String s = ".data\n"+
+          "    VAL" + data_count + ": .double "+value+"\n"
+          + "    IDX" + name + ": .double 0.0\n"+"    .text";
+    addCodeLine(s);
+    data_count++;
+    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
+    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+    addCodeLine("la " + " t0" + "," + "IDX"+name);
+    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
+    addCodeLine("la " + " t0" + "," + "IDX"+name);
+    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+  }
+  void generateIntAssign(String name, String value) {
+    // tempRegister is either t0 or t1 (if t0 is taken)
+    //String tempRegister = register.equals("t0") ? "t1" : "t0";
+    String s = ".data\n"+
+          "    VAL" + data_count + ": .double "+value+"\n"
+          + "    IDX" + name + ": .double 0.0\n"+"    .text";
+    addCodeLine(s);
+    data_count++;
+    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
+    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+    addCodeLine("la " + " t0" + "," + "IDX"+name);
+    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
+    addCodeLine("la " + " t0" + "," + "IDX"+name);
+    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+  }
+  void generateStringAssign(String name, String value) {
+    // tempRegister is either t0 or t1 (if t0 is taken)
+    //String tempRegister = register.equals("t0") ? "t1" : "t0";
+    String s = ".data\n"+
+          "    VAL" + data_count + ": .asciz "+value+"\n"
+          + "    IDX" + name + ": .asciz \" \"\n"+"    .text";
+    addCodeLine(s);
+    data_count++;
+    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
+    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+    addCodeLine("la " + " t0" + "," + "IDX"+name);
+    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
+    addCodeLine("la " + " t0" + "," + "IDX"+name);
+    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+  }
+  void emit(String s) {sb.append(s);}  
   //File generation
   void openProgram() {
     emit(".text"
@@ -404,7 +453,7 @@ assignment
 
                 String assignmentString = "";
                 if($typeOf.equals(Types.DOUBLE)) {
-                    assignmentString = "double ";
+                    //assignmentString = "double ";
 		            } else if($typeOf.equals(Types.BOOL)) {
                     assignmentString = "boolean ";
                 }
@@ -418,6 +467,7 @@ assignment
                   if(isDebug)
                     System.out.println(">>Array type: " +  newID.arrayType);
                     assignmentString += newID.id + "= new ArrayList<" + $a.javaType + ">();";
+
                   // addCodeLine(assignmentString);
 		              String appendString = "Collections.addAll("+newID.id+", new "+ $a.javaType +"[]{";
                   // add values
@@ -436,9 +486,18 @@ assignment
 
                 }
               if(!$typeOf.equals(Types.ARRAY)){
-	                assignmentString += $name.getText() + "=" + $value + ";";
+                assignmentString += $name.getText() + "=" + $value + ";";
+                  if($typeOf.equals(Types.DOUBLE)) {
+                  generateDoubleAssign($name.getText(), $value);
+                  // addCodeLine(assignmentString);
+                } else if($typeOf.equals(Types.INT)) {
+                  generateIntAssign($name.getText(), $value);
+                  // addCodeLine(assignmentString);
+                } else if($typeOf.equals(Types.STRING)) {
+                  generateStringAssign($name.getText(), $value);
                   // addCodeLine(assignmentString);
                 }
+            }
 
           } else { // if already exists then reassign
 	              if($typeOf.equals(Types.ARRAY)){
