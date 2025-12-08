@@ -318,9 +318,6 @@ grammar Simple;
     data_count++;
 
 	
-    // la t0, name
-    // la t1, tmpN
-    // sd t1, (t0)
 
     addCodeLine("la t0," + name);
     addCodeLine("la t1, " + tmpName);
@@ -425,6 +422,7 @@ grammar Simple;
     addCodeLine("call " + name);
   }
 }
+
 prog:
 	{
     openProgram();
@@ -455,7 +453,7 @@ assignment
 	    $value = $t.getText();
     }
 		| e = expr {
-	    if(isDebug)
+	    if(isDebug) 
         System.out.println("expression: " + $e.exprString);
       // can check if contains a decimal but doesnt check types of variables
       $typeOf = $e.typeOf;
@@ -1206,36 +1204,44 @@ input: input_decimal | input_string | input_number;
 
 input_string:
 	'input string ' a = VARIABLE_NAME {
-	    // addCodeLine($a.getText()+"=___protected___in___.nextLine();");
+        addCodeLine(".data \n\ttmp_input_space: .space 200 \n\t.text");
+        addCodeLine("li a7, 8"
+        + "\n\t la a0, tmp_input_space"  // address to store to
+        + "\n\tli a1, 200" // max length
+        + "\n\tecall");        
+
+        // assign var string tmp_input_space
+        addCodeLine("la t0, " + $a.getText()
+	        + "\n\tla t1, tmp_input_space"
+        + "\n\tsw t1, (t0)");
 };
 input_number:
 	'input number ' a = VARIABLE_NAME {
-	    // addCodeLine($a.getText()+"=___protected___in___.nextInt();");
+	    addCodeLine("li a7, 5"); // stores to a0 
+      addCodeLine("ecall");
+      addCodeLine("la t0, " + $a.getText());
+      addCodeLine("sw a0 (t0)");
 };
 input_decimal:
 	'input decimal ' a = VARIABLE_NAME {
-	    // addCodeLine($a.getText()+"=___protected___in___.nextDouble();");
-
+	      addCodeLine("li a7, 7"); // stores to fa0
+        addCodeLine("ecall");
+        addCodeLine("la t0, " + $a.getText());
+        addCodeLine("fsd fa0 (t0)");
 };
 
 printType
-	returns[Boolean hasKnownValue, String value, String code, boolean isVar]:
-	INT {
+	returns[Boolean hasKnownValue, String value, boolean isVar]:
+	(v = INT | v = DECIMAL) {
     $hasKnownValue = true; 
-    $value = $INT.getText();
-	  // $code = "System.out.println(" + $value + ");";
+    $value = $v.getText();
   }
-	| DECIMAL {$hasKnownValue = true; 
-  $value = $DECIMAL.getText();
-		  // $code = "System.out.println(" + $value + ");";
-
-  }
-	| STRING {$hasKnownValue = true; 
+	| STRING {
+    $hasKnownValue = true; 
     $value = $STRING.getText();
 
     // remove ""
 	    $value = $value.substring(1, $value.length() - 1);
-    $code = "System.out.println("+$value+");";
     }
 	| VARIABLE_NAME {
       $isVar = true;
@@ -1279,7 +1285,6 @@ printType
 	| expr {
           $hasKnownValue = true; 
           $value = String.valueOf($expr.value); 
-          // $code = "System.out.println("+String.valueOf($expr.value)+");";
 		};
 
 output
