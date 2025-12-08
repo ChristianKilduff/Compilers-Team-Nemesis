@@ -1,0 +1,55 @@
+n = 0
+print "input the array size"
+input number n
+
+while n less than or equal to 0 {
+    print "Array size n must be positive. Try again"
+    input number n
+}
+
+listA = [0.0]
+clear listA
+
+i = 0
+
+while i less than n{
+    input number temp
+    add temp to listA
+    i = i plus 1
+}
+
+mean = 0.0
+sum = 0.0
+assign min index 0 from listA
+assign max index 0 from listA
+
+i = 0
+
+while i less than n{
+    assign sum index i from listA
+
+    is index i from listA less than min {
+        assign min index i from listA
+    } if not is listA[i] greater than max{
+        max = listA[i]
+    }
+
+    i = i plus 1
+}
+
+mean = sum divided by n
+
+above_mean = 0
+i = 0
+
+while i less than n{
+    is listA[i] greater than mean{
+        above_mean = above_mean plus 1
+    }
+    i = i plus 1
+}
+
+print "mean = ", mean
+print "min = ", min
+print "max = ", max
+print "above_mean = ", above_mean
