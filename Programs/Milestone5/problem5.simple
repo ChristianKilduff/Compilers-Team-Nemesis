@@ -7,7 +7,7 @@ while n less than 0 {
     input number n
 }
 
-nSquared = n times n
+nSquared = n multiply n
 
 arrA = [0]
 clear arrA

@@ -1,5 +1,6 @@
-x=5.5
+x = 3
+y = 3
 
-input decimal x
-
-print x
+while x greater than or equal to y {
+    print "looping"
+}
