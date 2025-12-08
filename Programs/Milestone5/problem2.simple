@@ -1,0 +1,24 @@
+income = 0
+rate = 0
+tax = 0
+net = 0
+
+input number income
+
+is income less than 10000{
+    rate = 0
+} if not is income less than 40000{
+    rate = 10
+} if not is income less than 80000{
+    rate = 20
+} if not{
+    rate = 30
+}
+
+tax = (rate divide 100) multiply income
+net = income minus tax
+
+print "income " income
+print "rate " rate
+print "tax = " tax
+print "net = " net
