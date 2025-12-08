@@ -5,55 +5,29 @@
 
 main:
 	.data
-	x: .word 4
+	x: .word 3
 	.text
 	.data
-	y: .word 6
+	y: .word 3
 	.text
+	___CHECK______protected___loop____0:
 	la t0, x
 	lw t0, (t0)
 	la t1, y
 	lw t1, (t1)
-	blt t0, t1, ____IF____protected___Conditional____1
-	call ____ELSE____protected___Conditional____1
-	____IF____protected___Conditional____1: 
-	la t1, x
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
-	ecall
+	bge t0, t1, ______protected___loop____0
+	call ____return_from______protected___loop____0
+	______protected___loop____0: 
 	.data
-	pstr0: .asciz " is less than "
+	pstr0: .asciz "looping"
 	.text
 	la    a0, 	pstr0
 	li    a7, 4
 	ecall
 
-	la t1, y
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
-	ecall
-	call ____AFTER____protected___Conditional____1
-	____ELSE____protected___Conditional____1: 
-	la t1, x
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
-	ecall
-	.data
-	pstr1: .asciz " is greater than or equal to "
-	.text
-	la    a0, 	pstr1
-	li    a7, 4
-	ecall
-
-	la t1, y
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
-	ecall
-	____AFTER____protected___Conditional____1: 
+	call print_newline
+	call ___CHECK______protected___loop____0
+	____return_from______protected___loop____0:
 	jal end
 
 print_newline:

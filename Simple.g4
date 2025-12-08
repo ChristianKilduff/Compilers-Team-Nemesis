@@ -1059,23 +1059,25 @@ for_statement
   };
 
 while_statement
-	returns[String conditional, String loop_block_name, String return_to_block]:
+	returns[String conditional, String loop_block_name, String return_to_block, String check_block]:
 	'while' c = condition {
     $loop_block_name="______protected___loop____" + loop_index++;
     $return_to_block = "____return_from" + $loop_block_name;
+    $check_block = "___CHECK" + $loop_block_name;
 
     enterLoop($loop_block_name, $return_to_block);
-    addCodeLine("call "+$loop_block_name);
-    // addCodeLine()
 
-    
-    addCodeLine("addi t0, t0, 1");
-    addCodeLine("bgt t0, t1, "+ $return_to_block);
+    addCodeLine($check_block+":");
+
+    genConditionalCode($c.a, $c.b, $c.leftType, $c.rightType, $c.risc_word, $loop_block_name);
+    call($return_to_block);
+    addCodeLine($loop_block_name + ": ");
 
     
 
   } loopScope {
-      addLoopCall();
+      // addLoopCall();
+      call($check_block);
       addCodeLine($return_to_block + ":");
       finishLoop();
   };

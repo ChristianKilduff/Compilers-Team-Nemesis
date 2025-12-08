@@ -1,11 +1,6 @@
-x=4
-y=6
-is x less than y {
-    print x inline
-    print " is less than " inline
-    print y inline
-} if not {
-    print x inline
-    print " is greater than or equal to " inline
-    print y inline
+x = 3
+y = 3
+
+while x greater than or equal to y {
+    print "looping"
 }
