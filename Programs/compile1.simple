@@ -1,5 +1,3 @@
-x=3.3
-
-x=4.45
+x="hello"
 
 print x

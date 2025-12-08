@@ -276,7 +276,7 @@ grammar Simple;
       addCodeLine(new_double);
 
 	
-    addCodeLine("la " + " t0" + "," + dName);
+    addCodeLine("la t0," + dName);
     addCodeLine("fld  fa0, (t0)");
     addCodeLine("la t0, " + name);
     addCodeLine("fsd fa0, (t0)");
@@ -299,20 +299,33 @@ grammar Simple;
 
 
   void generateStringAssign(String name, String value) {
-    // tempRegister is either t0 or t1 (if t0 is taken)
-    //String tempRegister = register.equals("t0") ? "t1" : "t0";
-    String s = ".data\n"+
-          "    VAL" + data_count + ": .asciz "+value+"\n"
-          + "    IDX" + name + ": .asciz \" \"\n"+"    .text";
+      String s = ".data" 
+	    +"\n\t" + name +": .asciz " + value
+	    +"\n\t.text";
+
+    addCodeLine(s);
+    
+  }
+
+  void reassignString(String name, String value) {
+    data_count++;
+    String tmpName = "tmpStr_" + data_count;
+    String s = ".data" 
+	    +"\n\t" + tmpName +": .asciz \"" + value +"\""
+	    +"\n\t.text";
+
     addCodeLine(s);
     data_count++;
-    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+	
+    addCodeLine("la t0," + tmpName);
+    addCodeLine("fld  fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fsd fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fld fa0, (t0)");
   }
+
+
   void emit(String s) {sb.append(s);}  
   //File generation
   void openProgram() {
@@ -520,7 +533,7 @@ assignment
 
                       addCodeLine(reAssignCode);
                 } else if($typeOf.equals(Types.STRING)) {
-                
+                  reassignString($name.getText(), $value);
 	              } else if($typeOf.equals(Types.ARRAY)) {
                  
                 }
@@ -1244,12 +1257,19 @@ printType
               addCodeLine(loadStr);
               addCodeLine(printIntStr);
           } else if(id.type.equals(Types.DOUBLE)) {
-            String printDouble = "la t0, x"
+            String printDouble = "la t0, " + id.id
             + "\n\tfld fa0, (t0)"
             + "\n\tli a7, 3"
             + "\n\tecall";
 
             addCodeLine(printDouble);
+          } else if(id.type.equals(Types.STRING)) {
+            addCodeLine("la a0, " + id.id);
+            
+            String printStr = "li a7, 4"
+            + "\n\tecall";
+
+            addCodeLine(printStr);
           }
         }
         $hasKnownValue = false;
