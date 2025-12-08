@@ -1,14 +1,14 @@
 name = ""
-income = 0
-rent = 0
-food = 0
-fun = 0
+income = 0.0
+rent = 0.0
+food = 0.0
+fun = 0.0
 
 input string name
 input number income
 input number rent
 input number food
-input string fun
+input number fun
 
 total = rent plus food plus fun
 savings = income minus total
