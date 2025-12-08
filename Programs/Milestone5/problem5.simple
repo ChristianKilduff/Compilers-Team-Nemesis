@@ -1,0 +1,60 @@
+n = 0
+
+input number n
+while n less than 0 {
+    print"Array dimensions N must be positive. Try again."
+    n = 0
+    input number n
+}
+
+nSquared = n times n
+
+arrA = [0]
+clear arrA
+
+repeat nSquared {
+    in = 0
+    input int in
+    add in to arrA
+
+}
+
+arrB = [0]
+clear arrB
+
+repeat nSquared {
+    in = 0
+    input int in
+    add in to arrB
+
+}
+
+arrC = [0]
+clear arrC
+
+i = 0
+while i less than n {
+    j = 0
+    while j less than n {
+        s = 0
+        k = 0
+        while k less than n {
+            idA = i times n plus k
+            idB = k times n plus j
+            assign valueA index idA from arrA
+            assign valueB index idB from arrB
+            s = valueA times valueB plus s
+            k = k plus 1
+        }
+        add s to arrC
+        j = j plus 1
+    i = i plus 1
+    }
+        
+}
+i = 0
+repeat nSquared{
+    assign valueC index i from arrC
+    i = i plus 1
+    print valueC
+}
