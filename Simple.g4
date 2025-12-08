@@ -221,6 +221,7 @@ grammar Simple;
     return getVariable(varName) != null;
   }
 
+
   /** Variables that appear in any expression or print (i.e., used). */
   Set<String> used = new HashSet<>();
 
@@ -249,10 +250,85 @@ grammar Simple;
   }
   //Code generation
   StringBuilder sb = new StringBuilder();
+  //StringBuilder dataSb = new StringBuilder();
   StringBuilder sb2 = new StringBuilder();
+  int data_count = 0;
+  String CONST_PREFIX = "VAL";
   
-  
-  void emit(String s) {sb.append(s);}   
+
+  void generateDoubleAssign(String name, String value) {
+    String s = ".data"
+    +"\n\t" + name  + ": .double "+value
+    +"\n\t.text";
+    addCodeLine(s);
+
+
+  }
+
+
+  void reassignDouble(String name, String value) {
+	    String dName="DOUBLE_" + data_count;
+      data_count++;
+      String new_double = ".data"
+      + "\n\t" + dName + ": .double " + value
+      +"\n\t.text";
+
+      addCodeLine(new_double);
+
+	
+    addCodeLine("la t0," + dName);
+    addCodeLine("fld  fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fsd fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fld fa0, (t0)");
+  }
+  void generateIntAssign(String name, String value) {
+    String s = ".data\n"
+      + "\t" + name + ": .word " + value
+      +"\n\t.text";
+    addCodeLine(s);
+  }
+  void reassignInt(String varName, String value) {
+    // set t0 to the value wanted
+    addCodeLine("li t0, " + value);
+    // t1 = address of var
+    addCodeLine("la t1, " + varName);
+    addCodeLine("sw t0 0(t1)");
+  }
+
+
+  void generateStringAssign(String name, String value) {
+    String tmpN = name + "_tmp____protected";
+    String s = ".data" 
+		  + "\n\t" + tmpN + ": .asciz " + value
+      + "\n\t" + name + ": .word " + tmpN
+	    +"\n\t.text";
+    addCodeLine(s);
+  }
+
+  void reassignString(String name, String value) {
+    data_count++;
+    String tmpName = "tmpStr_" + data_count;
+    String s = ".data" 
+	    +"\n\t" + tmpName +": .asciz " + value +""
+	    +"\n\t.text";
+
+    addCodeLine(s);
+    data_count++;
+
+	
+    // la t0, name
+    // la t1, tmpN
+    // sd t1, (t0)
+
+    addCodeLine("la t0," + name);
+    addCodeLine("la t1, " + tmpName);
+    addCodeLine("sw t1, (t0)");
+  }
+
+
+  void emit(String s) {sb.append(s);}  
   //File generation
   void openProgram() {
     emit(".text"
@@ -310,16 +386,44 @@ grammar Simple;
 
 
 	  int loop_index = 0;
-    String returnToBlock = "";
-    void setReturnToMainBlock(String name) {
-	        returnToBlock = name;
+    void enterLoop(String block_name, String return_name) {
+      loopBlocks.push(block_name);
+      loopReturnBlocks.push(return_name);
     }
 
-    void clearReturnToBlock() {
-	      returnToBlock = "";
+    String getCurrLoopReturn() {
+	      return loopReturnBlocks.peek();
+    }
+
+    String finishLoop() {
+      loopBlocks.pop();
+	    return loopReturnBlocks.pop();
+    }
+
+    void addLoopCall() {
+      addCodeLine("call " + loopBlocks.peek());
+    }
+
+    boolean isInLoop() {
+      return !loopReturnBlocks.isEmpty();
+    }
+
+    String getLoop() {
+	      return loopBlocks.peek();
+    }
+
+    String getLoopReturn() {
+        return loopReturnBlocks.peek();
     }
 
 	int condition_index = 0;
+
+  Stack<String> loopBlocks = new Stack<String>();
+  Stack<String> loopReturnBlocks = new Stack<String>();
+
+  void call(String name) {
+    addCodeLine("call " + name);
+  }
 }
 prog:
 	{
@@ -406,49 +510,38 @@ assignment
 
                 String assignmentString = "";
                 if($typeOf.equals(Types.DOUBLE)) {
-                    assignmentString = "double ";
+                  generateDoubleAssign($name.getText(), $value);
 		            } else if($typeOf.equals(Types.BOOL)) {
-                    assignmentString = "boolean ";
+                  
                 }
                 else if($typeOf.equals(Types.INT)) {
-                    assignmentString = "int ";
+                  generateIntAssign($name.getText(), $value);
                 } else if($typeOf.equals(Types.STRING)) {
-                    assignmentString = "String ";
+                  generateStringAssign($name.getText(), $value);
 	              } else if($typeOf.equals(Types.ARRAY)) {
-                  assignmentString = "ArrayList<" + $a.javaType +"> ";
-                  newID.arrayType = $a.typeOf;
-                  if(isDebug)
-                    System.out.println(">>Array type: " +  newID.arrayType);
-                    assignmentString += newID.id + "= new ArrayList<" + $a.javaType + ">();";
-                  // addCodeLine(assignmentString);
-		              String appendString = "Collections.addAll("+newID.id+", new "+ $a.javaType +"[]{";
-                  // add values
-                  boolean isFirst = true;
-                  for(String v : $a.values) {
-                    if(isFirst) {
-                      isFirst=false;
-                      appendString += v;
-                      continue;
-                    } else {
-	                    appendString += "," + v;
-                    }
-                  }
-                  appendString+="});";
-                  // addCodeLine(appendString);
-
-                }
-              if(!$typeOf.equals(Types.ARRAY)){
-	                assignmentString += $name.getText() + "=" + $value + ";";
-                  // addCodeLine(assignmentString);
+                 
                 }
 
           } else { // if already exists then reassign
-	              if($typeOf.equals(Types.ARRAY)){
+		            if($typeOf.equals(Types.DOUBLE)) {
+                  reassignDouble($name.getText(), $value);
+		            } else if($typeOf.equals(Types.BOOL)) {
+                  
+                }
+                else if($typeOf.equals(Types.INT)) {
+	                    String reAssignCode = "li t0, " + $value
+                      +"\n\tla t1, " + $name.getText()
+                      +"\n\tsw t0, 0(t1)";
+
+                      addCodeLine(reAssignCode);
+                } else if($typeOf.equals(Types.STRING)) {
+                  reassignString($name.getText(), $value);
+	              } else if($typeOf.equals(Types.ARRAY)) {
+                 
+                }
+                else if($typeOf.equals(Types.ARRAY)){
 	                error($name,"Cannot reassign arrays");
                 }
-              newID.value = $value;
-              // addCodeLine(newID.id + "=" + $value + ";");
-
           }
       if(isDebug)
         System.out.println("Assigning | name: " + newID.id + " | value: " + newID.value + " | scope: " + newID.scope + " | Level: " + newID.scopeLevel + " | type: " + newID.type);
@@ -519,13 +612,13 @@ statement:
 	| condition
 	| output
 	| 'break' {
-      if(!isScopeGlobal() && returnToBlock != "")
-	      addCodeLine("call " + returnToBlock);
+      if(!loopReturnBlocks.empty())
+          call(getCurrLoopReturn());
       
   }
 	| 'continue' {
       if(!isScopeGlobal())
-        addCodeLine("call " + getScope());
+        addLoopCall();
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
 	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
@@ -773,109 +866,141 @@ conditional_statement
 		)
 	);
 condition
-	returns[String conditional, String condition_sign, String if_true_block, String if_false_block]:
-	a = varExprOrType {
-    $conditional=$a.asText;
+	returns[String a, String b, String risc_word, String condition_sign, boolean isNot]:
+	x = varExprOrType {
+    $a = $x.asText;
 } c = conditional_statement {
-    if($c.isNot) $conditional = "!(" + $conditional;
-    $conditional += $c.conditionSign;
-} b = varExprOrType {
-		$conditional+=$b.asText;
-    if($c.isNot) $conditional +=")";
-    if(isDebug)
-    System.out.println($conditional);
+    $isNot = $c.isNot;
+    $condition_sign = $c.conditionSign;
 
-    $if_true_block = "____PROTECTED_IF_TRUE____" + condition_index;
-    $if_false_block = "____PROTECTED_IF_FALSE____" + condition_index;
-    condition_index++;
-    addToCodeBlock($if_true_block, "");
-    addToCodeBlock($if_false_block, "");
+    switch($condition_sign) {
+      case ">":
+        $risc_word = "bgt";
+        break;
+      
+      case "<":
+        $risc_word = "blt";
+        break;
+      
+      case "==":
+        if($isNot) {
+          $risc_word = "beq";
+        } else {
+          $risc_word = "bne";
+        }
+        break;
+
+      case ">=":
+        $risc_word = "bge";
+        break;
+      
+      case "<=":
+        $risc_word = "ble";
+        break;
+      
+    }
+
+    System.out.println($condition_sign + " " +$risc_word);
+} y = varExprOrType {
+    $b = $y.asText;
 };
-
 if_statement
-	returns[String conditional]:
+	returns[String a, String b, String risc_word, boolean isNot]:
 	'is' c = condition {
-	  $conditional = $c.conditional;
-    // addCodeLine("if(" + $conditional + ")");
-};
-else_statement:
-	'if not' {
-  // addCodeLine("else");
-};
+    $a = $c.a;
+    $b = $c.b;
+    $risc_word = $c.risc_word;
+    $isNot = $c.isNot;
+    };
+else_statement: 'if not';
 
-if_scope
-	returns[ArrayList<String> codeLines]:
+if_scope:
 	'{' {
     addScopeLevel();
-    // addCodeLine("{"); // } – for some reason quoted brackets mess up vscode
-    } statement* '}' {removeScopeLevel();
-    // { – for some reason quoted brackets mess up vscode
-    // addCodeLine("}");
+    } statement* '}' {
+      removeScopeLevel();
     };
 
-if_else:
-	if_statement if_scope (else_statement if_statement if_scope)* (
-		else_statement if_scope
-	)?;
+if_else
+	locals[int index, String ifBlock, String elseBlock, String afterBlock]:
+	i = if_statement {
+    condition_index++;
+    $index = condition_index;
+	  $ifBlock = "____IF____protected___Conditional____" + $index;
+    $afterBlock = "____AFTER____protected___Conditional____" + $index;
+    $elseBlock = "____ELSE____protected___Conditional____" + $index;
+
+
+    // TODO condition values (rn just using t0 ? t1)
+    // addCodeLine("li t0, " + $i.a);
+    addCodeLine("li t1, " + $i.b);
+    addCodeLine($i.risc_word+" t0,t1," + $ifBlock);
+    addCodeLine("call " + $elseBlock);
+    addCodeLine($ifBlock + ": ");
+
+  } is = if_scope {
+    addCodeLine("call " + $afterBlock);
+    addCodeLine($elseBlock + ": ");
+
+  } (else_statement ifel = if_else)* (
+		e = else_statement is = if_scope
+	)? {
+    addCodeLine($afterBlock + ": ");
+  };
 
 for_statement
-	returns[String repeats, String start_block_name, String loop_block_name, String return_to_main_name]
+	returns[String repeats, String start_block_name, String loop_block_name, String return_to_block]
 		:
 	'repeat' (n = INT | n = VARIABLE_NAME) {
       $repeats = $n.getText();
       $loop_block_name="______protected___loop____" + loop_index++;
       $start_block_name = "____start" + $loop_block_name;
-      $return_to_main_name = "____return_from" + $loop_block_name;
-      addCodeLine("call "+$loop_block_name);
-      addCodeLine($return_to_main_name + ":");
-	    
-      setScope($loop_block_name);
-      // String i_name = "____protected_index____" + getScopeLevel();
-	    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
-      addToCodeBlock($start_block_name, "call " + $loop_block_name);
-      
-      addToCodeBlock($loop_block_name, "li t1, " + $repeats);
-      addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-      addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
+      $return_to_block = "____return_from" + $loop_block_name;
 
-	    returnToBlock = $return_to_main_name;
+      enterLoop($loop_block_name, $return_to_block);
+
+      call($loop_block_name);
+      addCodeLine($start_block_name + ": ");
+	    addCodeLine("\tli t0, 0 # stores in t0 which may and likely will overide other things");
+      call($loop_block_name);
+      
+      addCodeLine($loop_block_name + ":");
+      addCodeLine("li t1, " + $repeats);
+      addCodeLine("addi t0, t0, 1");
+      addCodeLine("bgt t0, t1, "+ $return_to_block);
   } loopScope {
-      addToCodeBlock($loop_block_name, "call " + $loop_block_name);
+      addLoopCall();
+      addCodeLine($return_to_block + ":");
+      finishLoop();
   };
 
 while_statement
-	returns[String conditional, String start_block_name, String loop_block_name, String return_to_main_name]
-		:
+	returns[String conditional, String loop_block_name, String return_to_block]:
 	'while' c = condition {
-    $conditional = $c.conditional;
-
     $loop_block_name="______protected___loop____" + loop_index++;
-    $start_block_name = "____start" + $loop_block_name;
-    $return_to_main_name = "____return_from" + $loop_block_name;
-    addCodeLine("call "+$loop_block_name);
-    addCodeLine($return_to_main_name + ":");
-    
-    setScope($loop_block_name);
-    // String i_name = "____protected_index____" + getScopeLevel();
-    addToCodeBlock($start_block_name, "\tli t0, 0 # stores in t0 which may and likely will overide other things");
-    addToCodeBlock($start_block_name, "call " + $loop_block_name);
-    
-    addToCodeBlock($loop_block_name, "addi t0, t0, 1");
-    addToCodeBlock($loop_block_name, "bgt t0, t1, "+ $return_to_main_name);
+    $return_to_block = "____return_from" + $loop_block_name;
 
-    returnToBlock = $return_to_main_name;    
+    enterLoop($loop_block_name, $return_to_block);
+    addCodeLine("call "+$loop_block_name);
+    // addCodeLine()
+
+    
+    addCodeLine("addi t0, t0, 1");
+    addCodeLine("bgt t0, t1, "+ $return_to_block);
+
+    
 
   } loopScope {
-      addToCodeBlock($loop_block_name, "call " + $loop_block_name);
+      addLoopCall();
+      addCodeLine($return_to_block + ":");
+      finishLoop();
   };
 
 loopScope:
 	'{' {
-	  // addScopeLevel();
+	  addScopeLevel();
     } statement* '}' {
-    // removeScopeLevel();
-    exitMainScope();
-	    returnToBlock = "";
+    removeScopeLevel();
     };
 
 functionDefinition
@@ -1094,7 +1219,7 @@ input_decimal:
 };
 
 printType
-	returns[Boolean hasKnownValue, String value, String code]:
+	returns[Boolean hasKnownValue, String value, String code, boolean isVar]:
 	INT {
     $hasKnownValue = true; 
     $value = $INT.getText();
@@ -1103,6 +1228,7 @@ printType
 	| DECIMAL {$hasKnownValue = true; 
   $value = $DECIMAL.getText();
 		  // $code = "System.out.println(" + $value + ");";
+
   }
 	| STRING {$hasKnownValue = true; 
     $value = $STRING.getText();
@@ -1112,15 +1238,41 @@ printType
     $code = "System.out.println("+$value+");";
     }
 	| VARIABLE_NAME {
-        String id = $VARIABLE_NAME.getText();
-        used.add(id);
-	      $value=id;
+      $isVar = true;
+        Identifier id = getVariable($VARIABLE_NAME.getText());
+        used.add(id.id);
         // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
-        if (!doesVariableExist(id)) {
+        if (id == null) {
           // General use-before-assign.
-          error($VARIABLE_NAME, "use of variable '" + id + "' before assignment");
+	          error($VARIABLE_NAME, "use of variable '" + $VARIABLE_NAME.getText() + "' before assignment");
         } else{
-            // $code = "System.out.println(" + id + ");";
+          // var exists
+          $value=id.id;
+          if(id.type.equals(Types.INT)) {
+              String loadStr = "la t1, " + id.id
+              +"\n\tlw t2, 0(t1)";
+
+              String printIntStr= "addi a0, t2, 0"
+              +"\n\tli    a7, 1"
+              +"\n\tecall";
+
+              addCodeLine(loadStr);
+              addCodeLine(printIntStr);
+          } else if(id.type.equals(Types.DOUBLE)) {
+            String printDouble = "la t0, " + id.id
+            + "\n\tfld fa0, (t0)"
+            + "\n\tli a7, 3"
+            + "\n\tecall";
+
+            addCodeLine(printDouble);
+          } else if(id.type.equals(Types.STRING)) {
+            addCodeLine("lw a0, " + id.id);
+            
+            String printStr = "li a7, 4"
+            + "\n\tecall";
+
+            addCodeLine(printStr);
+          }
         }
         $hasKnownValue = false;
       }
@@ -1135,15 +1287,17 @@ output
 	(
 		'print' v = printType (
 			'inline' {
-    $inline=true;
+      $inline=true;
   }
 		)?
 	) {
-    if($inline) {
-        addPrintLine($v.value);
-    } else {
-        addPrintLine($v.value);
-        addPrintNewLine();
+    if(!$v.isVar) {
+      if($inline) {
+          addPrintLine($v.value);
+      } else {
+          addPrintLine($v.value);
+          addPrintNewLine();
+      }
     }
   };
 

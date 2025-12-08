@@ -1,35 +1,46 @@
+
+
+.text
+.globl main
 main:
-    # --------------------------
-    # Allocate stack space (8 bytes)
-    # --------------------------
-    addi sp, sp, -8        # make room for x and y
+    # initializing int
+    .data
+    i : .word 0
+    .text
 
-    # --------------------------
-    # x = 3
-    # --------------------------
-    li t0, 3               # t0 = x
-    sw t0, 0(sp)           # store x at stack[0]
+    # set a variable
+    # x = 55
+    li t0, 55
+    la t1, i
+    sw t0, 0(t1)
 
-    # --------------------------
-    # y = 4
-    # --------------------------
-    li t1, 4               # t1 = y
-    sw t1, 4(sp)           # store y at stack[4]
 
-    # --------------------------
-    # Load y from stack and print it
-    # --------------------------
-    lw t2, 4(sp)           # t2 = y
-    mv a0, t2              # move y into a0 for printing
-    li a7, 1               # ecall: print integer
+    # load 
+    la t1, i
+    lw t2, 0(t1)     
+
+    # print
+    addi a0, t2, 0
+    li    a7, 1
     ecall
 
-    # --------------------------
-    # Deallocate stack
-    # --------------------------
-    addi sp, sp, 8
+    call print_newline
 
-    # return
+    .data
+    d: .dword 0        # allocate 8 bytes for a double, initialized to 0
+    .text
+
+    # store fa0 into memory
+    li fa0, 3.3
+    la   t0, d
+    fsd  fa0, 0(t0)     # store double into d
+
+    # load it back and print
+    fld  fa0, 0(t0)
+    li   a7, 3          # PrintDouble syscall (RARS)
+    ecall
+
+
     jal end
 
 

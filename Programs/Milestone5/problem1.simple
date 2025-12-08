@@ -1,0 +1,21 @@
+name = ""
+income = 0
+rent = 0
+food = 0
+fun = 0
+
+input string name
+input number income
+input number rent
+input number food
+input string fun
+
+total = rent plus food plus fun
+savings = income minus total
+
+print "Hello, " inline
+print name
+print "total = " inline
+print total
+print "savings = " inline
+print savings
