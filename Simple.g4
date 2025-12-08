@@ -425,6 +425,7 @@ grammar Simple;
     addCodeLine("call " + name);
   }
 }
+
 prog:
 	{
     openProgram();
@@ -455,7 +456,7 @@ assignment
 	    $value = $t.getText();
     }
 		| e = expr {
-	    if(isDebug)
+	    if(isDebug) 
         System.out.println("expression: " + $e.exprString);
       // can check if contains a decimal but doesnt check types of variables
       $typeOf = $e.typeOf;
@@ -1219,23 +1220,18 @@ input_decimal:
 };
 
 printType
-	returns[Boolean hasKnownValue, String value, String code, boolean isVar]:
-	INT {
+	returns[Boolean hasKnownValue, String value, boolean isVar]:
+	(v = INT | v = DECIMAL) {
     $hasKnownValue = true; 
-    $value = $INT.getText();
-	  // $code = "System.out.println(" + $value + ");";
+    $value = $v.getText();
+    $value = $DECIMAL.getText();
   }
-	| DECIMAL {$hasKnownValue = true; 
-  $value = $DECIMAL.getText();
-		  // $code = "System.out.println(" + $value + ");";
-
-  }
-	| STRING {$hasKnownValue = true; 
+	| STRING {
+    $hasKnownValue = true; 
     $value = $STRING.getText();
 
     // remove ""
 	    $value = $value.substring(1, $value.length() - 1);
-    $code = "System.out.println("+$value+");";
     }
 	| VARIABLE_NAME {
       $isVar = true;
@@ -1279,7 +1275,6 @@ printType
 	| expr {
           $hasKnownValue = true; 
           $value = String.valueOf($expr.value); 
-          // $code = "System.out.println("+String.valueOf($expr.value)+");";
 		};
 
 output
