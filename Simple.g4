@@ -257,32 +257,37 @@ grammar Simple;
   
 
   void generateDoubleAssign(String name, String value) {
-    // tempRegister is either t0 or t1 (if t0 is taken)
-    //String tempRegister = register.equals("t0") ? "t1" : "t0";
-    String s = ".data\n"+
-          "    VAL" + data_count + ": .double "+value+"\n"
-          + "    IDX" + name + ": .double 0.0\n"+"    .text";
+    String s = ".data"
+    +"\n\t" + name  + ": .double "+value
+    +"\n\t.text";
     addCodeLine(s);
-    data_count++;
-    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+
+
+  }
+
+
+  void reassignDouble(String name, String value) {
+	    String dName="DOUBLE_" + data_count;
+      data_count++;
+      String new_double = ".data"
+      + "\n\t" + dName + ": .double " + value
+      +"\n\t.text";
+
+      addCodeLine(new_double);
+
+	
+    addCodeLine("la t0," + dName);
+    addCodeLine("fld  fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fsd fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fld fa0, (t0)");
   }
   void generateIntAssign(String name, String value) {
     String s = ".data\n"
       + "\t" + name + ": .word " + value
       +"\n\t.text";
     addCodeLine(s);
-    // data_count++;
-    // addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    // addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    // addCodeLine("la " + " t0" + "," + "IDX"+name);
-    // addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    // addCodeLine("la " + " t0" + "," + "IDX"+name);
-    // addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
   }
   void reassignInt(String varName, String value) {
     // set t0 to the value wanted
@@ -294,20 +299,32 @@ grammar Simple;
 
 
   void generateStringAssign(String name, String value) {
-    // tempRegister is either t0 or t1 (if t0 is taken)
-    //String tempRegister = register.equals("t0") ? "t1" : "t0";
-    String s = ".data\n"+
-          "    VAL" + data_count + ": .asciz "+value+"\n"
-          + "    IDX" + name + ": .asciz \" \"\n"+"    .text";
+    String tmpN = name + "_tmp____protected";
+    String s = ".data" 
+		  + "\n\t" + tmpN + ": .asciz " + value
+      + "\n\t" + name + ": .word " + tmpN
+	    +"\n\t.text";
+    addCodeLine(s);
+  }
+
+  void reassignString(String name, String value) {
+    data_count++;
+    String tmpName = "tmpStr_" + data_count;
+    String s = ".data" 
+	    +"\n\t" + tmpName +": .asciz " + value +""
+	    +"\n\t.text";
+
     addCodeLine(s);
     data_count++;
-    addCodeLine("la " + " t0" + "," + "VAL"+(data_count-1));
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fsd " + " fa0" + ",(" + "t0" + ")");
-    addCodeLine("la " + " t0" + "," + "IDX"+name);
-    addCodeLine("fld " + " fa0" + ",(" + "t0" + ")");
+
+	
+
+    addCodeLine("la t0," + name);
+    addCodeLine("la t1, " + tmpName);
+    addCodeLine("sw t1, (t0)");
   }
+
+
   void emit(String s) {sb.append(s);}  
   //File generation
   void openProgram() {
@@ -405,6 +422,7 @@ grammar Simple;
     addCodeLine("call " + name);
   }
 }
+
 prog:
 	{
     openProgram();
@@ -435,7 +453,7 @@ assignment
 	    $value = $t.getText();
     }
 		| e = expr {
-	    if(isDebug)
+	    if(isDebug) 
         System.out.println("expression: " + $e.exprString);
       // can check if contains a decimal but doesnt check types of variables
       $typeOf = $e.typeOf;
@@ -504,7 +522,7 @@ assignment
 
           } else { // if already exists then reassign
 		            if($typeOf.equals(Types.DOUBLE)) {
-                
+                  reassignDouble($name.getText(), $value);
 		            } else if($typeOf.equals(Types.BOOL)) {
                   
                 }
@@ -515,7 +533,7 @@ assignment
 
                       addCodeLine(reAssignCode);
                 } else if($typeOf.equals(Types.STRING)) {
-                
+                  reassignString($name.getText(), $value);
 	              } else if($typeOf.equals(Types.ARRAY)) {
                  
                 }
@@ -1186,36 +1204,44 @@ input: input_decimal | input_string | input_number;
 
 input_string:
 	'input string ' a = VARIABLE_NAME {
-	    // addCodeLine($a.getText()+"=___protected___in___.nextLine();");
+        addCodeLine(".data \n\ttmp_input_space: .space 200 \n\t.text");
+        addCodeLine("li a7, 8"
+        + "\n\t la a0, tmp_input_space"  // address to store to
+        + "\n\tli a1, 200" // max length
+        + "\n\tecall");        
+
+        // assign var string tmp_input_space
+        addCodeLine("la t0, " + $a.getText()
+	        + "\n\tla t1, tmp_input_space"
+        + "\n\tsw t1, (t0)");
 };
 input_number:
 	'input number ' a = VARIABLE_NAME {
-	    // addCodeLine($a.getText()+"=___protected___in___.nextInt();");
+	    addCodeLine("li a7, 5"); // stores to a0 
+      addCodeLine("ecall");
+      addCodeLine("la t0, " + $a.getText());
+      addCodeLine("sw a0 (t0)");
 };
 input_decimal:
 	'input decimal ' a = VARIABLE_NAME {
-	    // addCodeLine($a.getText()+"=___protected___in___.nextDouble();");
-
+	      addCodeLine("li a7, 7"); // stores to fa0
+        addCodeLine("ecall");
+        addCodeLine("la t0, " + $a.getText());
+        addCodeLine("fsd fa0 (t0)");
 };
 
 printType
-	returns[Boolean hasKnownValue, String value, String code, boolean isVar]:
-	INT {
+	returns[Boolean hasKnownValue, String value, boolean isVar]:
+	(v = INT | v = DECIMAL) {
     $hasKnownValue = true; 
-    $value = $INT.getText();
-	  // $code = "System.out.println(" + $value + ");";
+    $value = $v.getText();
   }
-	| DECIMAL {$hasKnownValue = true; 
-  $value = $DECIMAL.getText();
-		  // $code = "System.out.println(" + $value + ");";
-
-  }
-	| STRING {$hasKnownValue = true; 
+	| STRING {
+    $hasKnownValue = true; 
     $value = $STRING.getText();
 
     // remove ""
 	    $value = $value.substring(1, $value.length() - 1);
-    $code = "System.out.println("+$value+");";
     }
 	| VARIABLE_NAME {
       $isVar = true;
@@ -1238,6 +1264,20 @@ printType
 
               addCodeLine(loadStr);
               addCodeLine(printIntStr);
+          } else if(id.type.equals(Types.DOUBLE)) {
+            String printDouble = "la t0, " + id.id
+            + "\n\tfld fa0, (t0)"
+            + "\n\tli a7, 3"
+            + "\n\tecall";
+
+            addCodeLine(printDouble);
+          } else if(id.type.equals(Types.STRING)) {
+            addCodeLine("lw a0, " + id.id);
+            
+            String printStr = "li a7, 4"
+            + "\n\tecall";
+
+            addCodeLine(printStr);
           }
         }
         $hasKnownValue = false;
@@ -1245,7 +1285,6 @@ printType
 	| expr {
           $hasKnownValue = true; 
           $value = String.valueOf($expr.value); 
-          // $code = "System.out.println("+String.valueOf($expr.value)+");";
 		};
 
 output
