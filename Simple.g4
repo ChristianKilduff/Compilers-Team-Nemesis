@@ -6,13 +6,14 @@ grammar Simple;
   boolean isDebug = true;
 
   class Types {
-    static String STRING = "String";
-    static String INT = "int";
-    static String DOUBLE = "double";
-    static String ARRAY= "array";
-    static String BOOL = "boolean";
-    static String FUNCTION_CALL = "function call";
-    static String UNKNOWN = "unknown";
+    final static String STRING = "String";
+    final static String INT = "int";
+    final static String DOUBLE = "double";
+    final static String ARRAY= "array";
+    final static String BOOL = "boolean";
+    final static String FUNCTION_CALL = "function call";
+    final static String VARIABLE = "variable";
+    final static String UNKNOWN = "unknown";
   }
 
   /** Identifier type */
@@ -412,6 +413,58 @@ grammar Simple;
     String getLoopReturn() {
         return loopReturnBlocks.peek();
     }
+
+
+  void genConditionalCode(String left, String right, String leftType, String rightType, String risc_word, String ifBlock) {
+    Map<String,String> leftMap = genConditionalCodeHelper(left, leftType, 0);
+    Map<String,String> rightMap = genConditionalCodeHelper(right, rightType, 1);
+
+    String code = rightMap.get("conditional_code");
+    code = code.replace("<risc>", risc_word);
+    code = code.replace("<branch>", ifBlock);
+    code = code.replace("<left_register>", leftMap.get("register"));
+    code = code.replace("<right_register>", rightMap.get("register"));
+    addCodeLine(code);
+
+  }
+
+Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
+  Map<String,String> outmap = new HashMap();
+  String addressRegister = "t" + i;
+  String valueRegister = addressRegister;
+  System.out.println(type);
+  if(type.equals(Types.VARIABLE)) {
+    Identifier var = getVariable(a);
+      addCodeLine("la "+ addressRegister+ ", " + a);
+    if(var.type.equals(Types.INT)) {
+      addCodeLine("lw " + valueRegister + ", (" + addressRegister + ")");
+      outmap.put("conditional_code", "b<risc> <left_register>, <right_register>, <branch>");
+    } else if(var.type.equals(Types.DOUBLE)) {
+      valueRegister = "fa" + i;
+      addCodeLine("fld " + valueRegister + ", (" + addressRegister + ")");
+      outmap.put("conditional_code", "f<risc>.d t2, <left_register>, <right_register>" + "\n\tbnez t2, <branch>");
+    }
+  } else if(type.equals(Types.DOUBLE)) {
+    data_count++;
+    valueRegister = "fa" + i;
+
+    String tmpVarName = "tmp_d_______" + data_count;
+    addCodeLine(".data\n\t"+tmpVarName+": .double " + a +"\n\t.text");
+    addCodeLine("la t0, " + tmpVarName);
+	  addCodeLine("fld " + valueRegister + ", (t0)");
+
+    outmap.put("conditional_code", "f<risc>.d t2, fa0, fa1" + "\n\tbnez t2, <branch>");
+
+  } else if(type.equals(Types.INT)) {
+    outmap.put("conditional_code", "b<risc> <left_register>, <right_register>, <branch>");
+    addCodeLine("li "+ valueRegister+ ", " + a);
+  }
+  
+  outmap.put("register", valueRegister);
+  return outmap;
+
+}
+
 
 	int condition_index = 0;
 
@@ -864,36 +917,38 @@ conditional_statement
 		)
 	);
 condition
-	returns[String a, String b, String risc_word, String condition_sign, boolean isNot]:
+	returns[String a, String b, String leftType, String rightType, String risc_word, String condition_sign, boolean isNot]
+		:
 	x = varExprOrType {
     $a = $x.asText;
+    $leftType = $x.typeOf;
 } c = conditional_statement {
     $isNot = $c.isNot;
     $condition_sign = $c.conditionSign;
 
     switch($condition_sign) {
       case ">":
-        $risc_word = "bgt";
+        $risc_word = "gt";
         break;
       
       case "<":
-        $risc_word = "blt";
+        $risc_word = "lt";
         break;
       
       case "==":
         if($isNot) {
-          $risc_word = "beq";
+          $risc_word = "eq";
         } else {
-          $risc_word = "bne";
+          $risc_word = "ne";
         }
         break;
 
       case ">=":
-        $risc_word = "bge";
+        $risc_word = "ge";
         break;
       
       case "<=":
-        $risc_word = "ble";
+        $risc_word = "le";
         break;
       
     }
@@ -901,14 +956,30 @@ condition
     System.out.println($condition_sign + " " +$risc_word);
 } y = varExprOrType {
     $b = $y.asText;
+    $rightType = $y.typeOf;
 };
 if_statement
-	returns[String a, String b, String risc_word, boolean isNot]:
-	'is' c = condition {
+	returns[String a, String b, String leftType, String rightType, String risc_word, boolean isNot]:
+	i = 'is' c = condition {
     $a = $c.a;
     $b = $c.b;
+    $leftType = $c.leftType;
+    $rightType = $c.rightType;
     $risc_word = $c.risc_word;
     $isNot = $c.isNot;
+
+
+    String lSubT = $leftType;
+    String rSubT = $rightType;
+    if($leftType.equals(Types.VARIABLE)) {
+      lSubT = getVariable($a).type;
+    }
+    if($rightType.equals(Types.VARIABLE)) {
+      rSubT = getVariable($b).type;
+    }
+    if(!lSubT.equals(rSubT)) {
+      error($i, " conditionals can only compare variables or constants of the same exact type");
+    }
     };
 else_statement: 'if not';
 
@@ -929,10 +1000,8 @@ if_else
     $elseBlock = "____ELSE____protected___Conditional____" + $index;
 
 
-    // TODO condition values (rn just using t0 ? t1)
-    // addCodeLine("li t0, " + $i.a);
-    addCodeLine("li t1, " + $i.b);
-    addCodeLine($i.risc_word+" t0,t1," + $ifBlock);
+
+    genConditionalCode($i.a, $i.b, $i.leftType, $i.rightType, $i.risc_word, $ifBlock);
     addCodeLine("call " + $elseBlock);
     addCodeLine($ifBlock + ": ");
 
@@ -1307,14 +1376,20 @@ output
   };
 
 varExprOrType
-	returns[String asText]:
-	(t = VARIABLE_NAME | t = STRING | t = BOOL) {
+	returns[String asText, String typeOf]:
+	(
+		t = VARIABLE_NAME {$typeOf=Types.VARIABLE;}
+		| t = STRING {$typeOf=Types.STRING;}
+		| t = BOOL {$typeOf=Types.BOOL;}
+	) {
     $asText=$t.getText();
   }
 	| e = expr {
+      $typeOf=$e.typeOf;
 	    $asText = $e.exprString;
   }
 	| f = functionCall {
+	      $typeOf=Types.FUNCTION_CALL;
       $asText = $f.value;
   };
 type: INT | STRING | DECIMAL | BOOL;

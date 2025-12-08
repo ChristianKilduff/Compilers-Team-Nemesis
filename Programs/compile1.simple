@@ -1,5 +1,11 @@
-x=5.5
-
-input decimal x
-
-print x
+x=4
+y=6
+is x less than y {
+    print x inline
+    print " is less than " inline
+    print y inline
+} if not {
+    print x inline
+    print " is greater than or equal to " inline
+    print y inline
+}
