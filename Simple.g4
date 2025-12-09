@@ -223,7 +223,7 @@ grammar Simple;
       RiscArray arr  = new RiscArray(type);
       ARRAYS.put(name, arr);
       for(String v : values) {
-        arr.add(v);
+        arr.add(v, false);
       }
 
       return arr;
@@ -240,7 +240,11 @@ grammar Simple;
       this.type = type;
     }
 
-    void add(String value) {
+    void add(String value, boolean isVar) {
+      if(isVar) {
+        variables.add(value);
+        return;
+      }
       String varName = "____ARRAY" + c + "____ELEMENT____" + i;
       i++;
       variables.add(varName);
@@ -251,16 +255,19 @@ grammar Simple;
         generateDoubleAssign(varName, value);
       } else if(type.equals(Types.STRING)) {
         generateStringAssign(varName, value);
-      }
+      } 
     }
-
     int size() {
       return this.variables.size();
     }
 
-    void set(int index, String value) {
+    void set(int index, String value, boolean isVar) {
+      if(isVar) {
+        variables.set(index, value);
+        return;
+      }
       String varName = variables.get(index);
-	      if(type.equals(Types.INT)) {
+      if(type.equals(Types.INT)) {
         reassignInt(varName, value);
       } else if(type.equals(Types.DOUBLE)) {
         reassignDouble(varName, value);
@@ -268,6 +275,7 @@ grammar Simple;
         reassignString(varName, value);
       }
     }
+
 
     void remove(int index) {
       variables.remove(index);
@@ -344,6 +352,34 @@ grammar Simple;
     addCodeLine("la t0, " + name);
     addCodeLine("fld fa0, (t0)");
   }
+
+  void generateAssign(String name, String value, String type) {
+		    if(type.equals(Types.DOUBLE)) {
+          generateDoubleAssign(name, value);
+        } 
+        else if(type.equals(Types.INT)) {
+          generateIntAssign(name, value);
+        } else if(type.equals(Types.STRING)) {
+          generateStringAssign(name, value);
+        } 
+  }
+
+  void generateReassign(String name, String value, String type) {
+      if(type.equals(Types.DOUBLE)) {
+        reassignDouble(name, value);
+      }
+      else if(type.equals(Types.INT)) {
+            String reAssignCode = "li t0, " + value
+            +"\n\tla t1, " + name
+            +"\n\tsw t0, 0(t1)";
+
+            addCodeLine(reAssignCode);
+      } else if(type.equals(Types.STRING)) {
+        reassignString(name, value);
+      } 
+  }
+
+
   void generateIntAssign(String name, String value) {
     String s = ".data\n"
       + "\t" + name + ": .word " + value
@@ -540,6 +576,59 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
   void call(String name) {
     addCodeLine("call " + name);
   }
+
+
+  void printVar(String name, String type) {
+
+        if(type.equals(Types.INT)) {
+              String loadStr = "la t1, " + name
+              +"\n\tlw t2, 0(t1)";
+
+              String printIntStr= "addi a0, t2, 0"
+              +"\n\tli    a7, 1"
+              +"\n\tecall";
+
+              addCodeLine(loadStr);
+              addCodeLine(printIntStr);
+          } else if(type.equals(Types.DOUBLE)) {
+            String printDouble = "la t0, " + name
+            + "\n\tfld fa0, (t0)"
+            + "\n\tli a7, 3"
+            + "\n\tecall";
+
+            addCodeLine(printDouble);
+          } else if(type.equals(Types.STRING)) {
+            addCodeLine("lw a0, " + name);
+            
+            String printStr = "li a7, 4"
+            + "\n\tecall";
+
+            addCodeLine(printStr);
+          } else if(type.equals(Types.ARRAY)) {
+            RiscArray arr = ARRAYS.get(name);
+            if(arr != null) {
+              for(String varName : arr.variables) {
+                printVar(varName, arr.type);
+                addPrintLine(" ");
+              }
+            }
+          }
+  }
+
+  void assignVarToVar(String toAssign, String assignFrom, String type) {
+    if(type.equals(Types.INT) | type.equals(Types.STRING)) {
+      addCodeLine("la t0, " + assignFrom 
+      + "\n\tlw t1 (t0)" 
+      + "\n\tla t2, " + toAssign 
+      + "\n\tsw t1 (t2)");
+    } else if(type.equals(Types.DOUBLE)) {
+      addCodeLine("la t0, " + assignFrom 
+      + "\n\tfld fa0 (t0)" 
+      + "\n\tla t2, " + toAssign 
+      + "\n\tfsd fa0 (t2)");
+    }
+
+  }
 }
 
 prog:
@@ -561,7 +650,7 @@ prog:
 	  };
 
 assignment
-	locals[String value, String typeOf, boolean isError]:
+	locals[String value, String typeOf, boolean isError, boolean isVar]:
 	name = VARIABLE_NAME '=' (
 		t = DECIMAL {
       $typeOf = Types.DOUBLE;
@@ -570,14 +659,6 @@ assignment
 		| t = INT {
       $typeOf = Types.INT;
 	    $value = $t.getText();
-    }
-		| e = expr {
-	    if(isDebug) 
-        System.out.println("expression: " + $e.exprString);
-      // can check if contains a decimal but doesnt check types of variables
-      $typeOf = $e.typeOf;
-      // $value = String.valueOf($e.value);
-      $value=$e.exprString;
     }
 		| t = STRING {
       $typeOf = Types.STRING;
@@ -600,9 +681,18 @@ assignment
           error($v, "Error attempting to assign a variable that is not defined (there is a variable defined that is out of scope)");
           $isError = true;
       } else {
-	        $value = var.value;    
+        $value = var.value;    
         $typeOf = var.type;
+        $isVar = true;
       }
+    }
+		| e = expr {
+	    if(isDebug) 
+        System.out.println("expression: " + $e.exprString);
+      // can check if contains a decimal but doesnt check types of variables
+      $typeOf = $e.typeOf;
+      // $value = String.valueOf($e.value);
+      $value=$e.exprString;
     }
 	) {
     if(!$isError) {
@@ -626,39 +716,26 @@ assignment
                 newID = createVariable($name.getText(), $value, $typeOf);
 
                 String assignmentString = "";
-                if($typeOf.equals(Types.DOUBLE)) {
-                  generateDoubleAssign($name.getText(), $value);
-		            } else if($typeOf.equals(Types.BOOL)) {
-                  
-                }
-                else if($typeOf.equals(Types.INT)) {
-                  generateIntAssign($name.getText(), $value);
-                } else if($typeOf.equals(Types.STRING)) {
-                  generateStringAssign($name.getText(), $value);
-	              } else if($typeOf.equals(Types.ARRAY)) {
-	                  generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
+                if($isVar) {
+                  String v = "";
+                  if($typeOf.equals(Types.DOUBLE)) v = "0.0";
+                  else if($typeOf.equals(Types.INT)) v = "0";
+                  generateAssign($name.getText(), v, $typeOf);
+                  assignVarToVar(newID.id, $v.getText(), $typeOf);
+                } else if($typeOf.equals(Types.ARRAY)) {
+                    generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
+                } else {
+                  generateAssign($name.getText(), $value, $typeOf);
                 }
 
           } else { // if already exists then reassign
-		            if($typeOf.equals(Types.DOUBLE)) {
-                  reassignDouble($name.getText(), $value);
-		            } else if($typeOf.equals(Types.BOOL)) {
-                  
-                }
-                else if($typeOf.equals(Types.INT)) {
-	                    String reAssignCode = "li t0, " + $value
-                      +"\n\tla t1, " + $name.getText()
-                      +"\n\tsw t0, 0(t1)";
-
-                      addCodeLine(reAssignCode);
-                } else if($typeOf.equals(Types.STRING)) {
-                  reassignString($name.getText(), $value);
-	              } else if($typeOf.equals(Types.ARRAY)) {
-                 
-                }
-                else if($typeOf.equals(Types.ARRAY)){
-	                error($name,"Cannot reassign arrays");
-                }
+	          if($isVar) {
+	              assignVarToVar(newID.id, $v.getText(), $typeOf);
+            } else if($typeOf.equals(Types.ARRAY)){
+                error($name,"Cannot reassign arrays");
+            } else{
+                generateReassign($name.getText(), $value, $typeOf);
+            }
           }
       if(isDebug)
         System.out.println("Assigning | name: " + newID.id + " | value: " + newID.value + " | scope: " + newID.scope + " | Level: " + newID.scopeLevel + " | type: " + newID.type);
@@ -772,17 +849,17 @@ append_to_array:
     if(arr == null) {
       error($n, "Error array does not exist");
     } else {
-    if($v.typeOf.equals(Types.VARIABLE) | $v.isExpression) {
+    if($v.typeOf.equals(Types.VARIABLE)) {
       Identifier var = getVariable($v.asText);
       if(!var.type.equals(arr.type)) {
         error($n, "var type does not match array type");
         } else {
-          // TODO add variable value to array
+          arr.add($v.asText, true);
         }
-      } else if(!$v.typeOf.equals(arr.type)) {
+      } else if(!$v.typeOf.equals(arr.type) || $v.isExpression) {
         error($n, "type of array does not match input");
       } else {
-        arr.add($v.asText);
+        arr.add($v.asText, false);
       }
     }
 };
@@ -807,7 +884,7 @@ replace_index_array
 	locals[int index]:
 	'replace index ' (
 		i = INT {
-		      $index = Integer.parseInt($i.getText()) - 1;
+        $index = Integer.parseInt($i.getText()) - 1;
 	  }
 		| i_v = VARIABLE_NAME {
 	      // TODO
@@ -820,8 +897,7 @@ replace_index_array
     } else if($index >= arr.size() || $index < 0) {
         error($n, "Index out of bounds");
     } else {
-      // TODO set it to the variable
-      arr.set($index, "test");
+      arr.set($index, $v.getText(), true);
     }
 };
 remove_from_array
@@ -846,30 +922,43 @@ remove_from_array
 };
 
 get_from_array
-	locals[String index_code]:
+	locals[int index]:
 	'assign ' v = VARIABLE_NAME ' index ' (
 		i = INT {
-		      $index_code = "" + (Integer.parseInt($i.getText()) - 1);
+	        $index = (Integer.parseInt($i.getText()) - 1);
 	  }
 		| i_v = VARIABLE_NAME {
-	      $index_code = $i_v.getText();
+      // TODO get index from a variable
+      Identifier id = getVariable($i_v.getText());
+      if(id == null) {
+        error($i_v, "variable does not exist");
+      } if(!id.type.equals(Types.INT)) {
+        error($i_v, "variable is not an int");
+      } else {
+        $index = Integer.parseInt(id.value)-1;
+      }
     }
 	) ' from ' n = VARIABLE_NAME {
-  Identifier arrayID = getVariable($n.getText());
+  RiscArray arr = ARRAYS.get($n.getText());
   Identifier newID = getVariable($v.getText());
-    if(arrayID == null)  {
+    if(arr == null)  {
 	      error($n, "array does not exist");
     } else {
-      String type = "";
-      if(newID == null) {
-          newID = createVariable($v.getText(), "", arrayID.arrayType);
-          type = newID.type;
-        } 
-      if(!arrayID.arrayType.equals(newID.type)) {
+      String arrType = arr.type;
+      if(newID != null && !arrType.equals(newID.type)) {
         error($n, "type of array does not match type of variable");
-      }  else {
-
-        // addCodeLine(type + " " + $v.getText() + "="+$n.getText() + ".get(" + $index_code + ");");
+      } else {
+        if(newID == null) {
+            newID = createVariable($v.getText(), "", arrType);
+            if(arrType.equals(Types.DOUBLE)) {
+              generateDoubleAssign(newID.id, "0.0");
+            } else if(arrType.equals(Types.INT)) {
+              generateIntAssign(newID.id, "0");
+            } else if(arrType.equals(Types.STRING)) {
+              generateStringAssign(newID.id, "");
+            }
+        } 
+          assignVarToVar(newID.id, arr.variables.get($index), arrType);
       }
     }
 };
@@ -1462,32 +1551,7 @@ printType
 	          error($VARIABLE_NAME, "use of variable '" + $VARIABLE_NAME.getText() + "' before assignment");
         } else{
           // var exists
-          $value=id.id;
-          if(id.type.equals(Types.INT)) {
-              String loadStr = "la t1, " + id.id
-              +"\n\tlw t2, 0(t1)";
-
-              String printIntStr= "addi a0, t2, 0"
-              +"\n\tli    a7, 1"
-              +"\n\tecall";
-
-              addCodeLine(loadStr);
-              addCodeLine(printIntStr);
-          } else if(id.type.equals(Types.DOUBLE)) {
-            String printDouble = "la t0, " + id.id
-            + "\n\tfld fa0, (t0)"
-            + "\n\tli a7, 3"
-            + "\n\tecall";
-
-            addCodeLine(printDouble);
-          } else if(id.type.equals(Types.STRING)) {
-            addCodeLine("lw a0, " + id.id);
-            
-            String printStr = "li a7, 4"
-            + "\n\tecall";
-
-            addCodeLine(printStr);
-          }
+          printVar(id.id, id.type);
         }
         $hasKnownValue = false;
       }
@@ -1505,15 +1569,10 @@ output
   }
 		)?
 	) {
-    if(!$v.isVar) {
-      if($inline) {
-          addPrintLine($v.value);
-      } else {
-          addPrintLine($v.value);
-          addPrintNewLine();
-      }
-    }
-  };
+    if(!$v.isVar) addPrintLine($v.value);
+      if(!$inline) addPrintNewLine();
+    
+};
 
 varExprOrType
 	returns[String asText, String typeOf, boolean isExpression]:

@@ -1,8 +1,7 @@
-list=[1,2,3]
-x=4
+list=[1.0,2.2,3.0]
 
-add 1 to list
-remove index 1 from list
-assign l length of list
+i=2
+assign x index i from list
 
-print l
+print list
+print x

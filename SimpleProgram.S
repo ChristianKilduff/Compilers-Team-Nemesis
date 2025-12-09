@@ -5,28 +5,70 @@
 
 main:
 	.data
-	____ARRAY0____ELEMENT____0: .word 1
+	____ARRAY0____ELEMENT____0: .double 1.0
 	.text
 	.data
-	____ARRAY0____ELEMENT____1: .word 2
+	____ARRAY0____ELEMENT____1: .double 2.2
 	.text
 	.data
-	____ARRAY0____ELEMENT____2: .word 3
+	____ARRAY0____ELEMENT____2: .double 3.0
 	.text
 	.data
-	x: .word 4
+	i: .word 2
 	.text
 	.data
-	____ARRAY0____ELEMENT____3: .word 1
+	b: .word 0
 	.text
+	la t0, i
+	lw t1 (t0)
+	la t2, b
+	sw t1 (t2)
 	.data
-	l: .word 3
+	x: .double 0.0
 	.text
-	la t1, l
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
+	la t0, ____ARRAY0____ELEMENT____1
+	fld fa0 (t0)
+	la t2, x
+	fsd fa0 (t2)
+	la t0, ____ARRAY0____ELEMENT____0
+	fld fa0, (t0)
+	li a7, 3
 	ecall
+	.data
+	pstr0: .asciz " "
+	.text
+	la    a0, 	pstr0
+	li    a7, 4
+	ecall
+
+	la t0, ____ARRAY0____ELEMENT____1
+	fld fa0, (t0)
+	li a7, 3
+	ecall
+	.data
+	pstr1: .asciz " "
+	.text
+	la    a0, 	pstr1
+	li    a7, 4
+	ecall
+
+	la t0, ____ARRAY0____ELEMENT____2
+	fld fa0, (t0)
+	li a7, 3
+	ecall
+	.data
+	pstr2: .asciz " "
+	.text
+	la    a0, 	pstr2
+	li    a7, 4
+	ecall
+
+	call print_newline
+	la t0, x
+	fld fa0, (t0)
+	li a7, 3
+	ecall
+	call print_newline
 	jal end
 
 print_newline:
