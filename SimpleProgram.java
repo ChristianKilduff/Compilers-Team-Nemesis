@@ -13,36 +13,49 @@ ArrayList<Double> listA= new ArrayList<Double>();
 Collections.addAll(listA, new Double[]{0.0});
 listA.clear();
 int i=0;
+double x=0.0;
 while(i<n) {
-temp=___protected___in___.nextInt();
-listA.add(temp);
+x=___protected___in___.nextInt();
+listA.add(x);
 i=i + 1;
 }
-double total=listA.get(-1);
+double total=listA.get(0);
 double sum=0.0;
-double min=listA.get(-1);
-double max=listA.get(-1);
+double min=listA.get(0);
+double max=listA.get(0);
 i=1;
 while(i<n) {
  sum=listA.get(i);
 total=total + sum;
 if(sum<min)
 {
-sum=min;
+min=sum;
 }
 if(sum>max)
 {
-sum=max;
+max=sum;
 }
 i=i + 1;
 }
-double mean=total;
+double mean=total / n;
 int above_mean=0;
 i=0;
+double y=0.0;
 while(i<n) {
-if(listAnulli)
+ y=listA.get(i);
+if(y>mean)
+{
 above_mean=above_mean + 1;
 }
 i=i + 1;
+}
+System.out.print("mean = ");
+System.out.println(mean);
+System.out.print("min = ");
+System.out.println(min);
+System.out.print("max = ");
+System.out.println(max);
+System.out.print("above_mean = ");
+System.out.println(above_mean);
 }
 }

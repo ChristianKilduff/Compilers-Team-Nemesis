@@ -11,17 +11,17 @@ listA = [0.0]
 clear listA
 
 i = 0
-
+x = 0.0
 while i less than n{
-    input number temp
-    add temp to listA
+    input number x
+    add x to listA
     i = i plus 1
 }
 
-assign total index 0 from listA
+assign total index 1 from listA
 sum = 0.0
-assign min index 0 from listA
-assign max index 0 from listA
+assign min index 1 from listA
+assign max index 1 from listA
 
 i = 1
 
@@ -30,28 +30,33 @@ while i less than n{
     total = total plus sum
 
     is sum less than min {
-        sum = min
+        min = sum
     } 
     is sum greater than max {
-        sum = max
+        max = sum
     }
 
     i = i plus 1
 }
-
-mean = total divided by n
+mean = total divide n
 
 above_mean = 0
-i = 0
 
+i = 0
+y = 0.0
 while i less than n{
-    is listA[i] greater than mean{
+    assign y index i from listA
+    is y greater than mean{
         above_mean = above_mean plus 1
     }
     i = i plus 1
 }
 
-print "mean = ", mean
-print "min = ", min
-print "max = ", max
-print "above_mean = ", above_mean
+print "mean = " inline 
+print mean
+print "min = " inline
+print min
+print "max = " inline 
+print max
+print "above_mean = " inline
+print above_mean
