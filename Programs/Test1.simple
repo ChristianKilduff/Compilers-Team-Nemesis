@@ -1,0 +1,9 @@
+list =[0.0]
+
+add 1.0 to list
+
+print list
+
+clear list
+
+print list

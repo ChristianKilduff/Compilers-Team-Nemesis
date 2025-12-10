@@ -373,13 +373,16 @@ grammar Simple;
 
     // all ai
     void print() {
+	      int c = data_count++;
+        String loop_name = "loop_" + c;
+        String done_name = "done_" + c;
         String code = 
             "\n\tla t0, " + name + "\n\t" // arr address (t0)
             + "lw t1, " + sizeVarName  + "\n\t" // size of array (t1)
             + "li t2, 0 \n\t" // index (t2)
             + "\n\t"
-            + "loop:\n\t"
-            + "bge t2, t1, done  # if index >= count, exit loop\n\t"; // loop while index < count
+	            + loop_name +":\n\t"
+            + "bge t2, t1, " + done_name +"\n\t"; // loop while index < count
 
         if (type.equals(Types.DOUBLE)) {
             // For double
@@ -405,9 +408,9 @@ grammar Simple;
         // Increment index and loop
         code += 
             "addi t2, t2, 1\n\t" +
-            "j loop\n\t" +
-            "\n\t" +
-            "done:\n\t";
+            "j " + loop_name+ "\n\t" +
+            "\n\t"
+            + done_name +":\n\t";
 
         addCodeLine(code);
     }
