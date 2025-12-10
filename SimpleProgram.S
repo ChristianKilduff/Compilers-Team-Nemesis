@@ -1,8 +1,6 @@
 	.data
-	____PARAM____add_____0: .word 0
-	.text
-	.data
-	____PARAM____add_____1: .word 0
+	space_tmp____protected: .asciz " "
+	space: .word space_tmp____protected
 	.text
 .text
 .globl main
@@ -10,82 +8,71 @@
 .globl print_newline
 
 main:
-	li t0, 1
-	la t1, ____PARAM____add_____0
-	sw t0 0(t1)
-	li t0, 11
-	la t1, ____PARAM____add_____1
-	sw t0 0(t1)
-	jal ____FUNCTION___add
 	.data
-	pstr1: .asciz "hello"
+	list: .space 400
+	count_arr_1:   .word 0
 	.text
-	la    a0, 	pstr1
-	li    a7, 4
-	ecall
 
+	
+	#====
+	la t0, count_arr_1
+	lw t1, 0(t0)
+	la t2, list
+	slli t3, t1, 3
+	add t3, t2, t3
+	.data
+	double____0: .double 0.0
+	.text
+	la t4, double____0
+	fld fa0, 0(t4)
+	fsd fa0, 0(t3)
+	addi t1, t1, 1
+	la t0, count_arr_1
+	sw t1, 0(t0)
+	#_____
+	
+	
+	#====
+	la t0, count_arr_1
+	lw t1, 0(t0)
+	la t2, list
+	slli t3, t1, 3
+	add t3, t2, t3
+	.data
+	double____1: .double 3.0
+	.text
+	la t4, double____1
+	fld fa0, 0(t4)
+	fsd fa0, 0(t3)
+	addi t1, t1, 1
+	la t0, count_arr_1
+	sw t1, 0(t0)
+	#_____
+	
+	
+	la t0, list
+	lw t1, count_arr_1
+	li t2, 0 
+	
+	loop:
+	bge t2, t1, done  # if index >= count, exit loop
+	slli t3, t2, 3    # t3 = index * 8 (double size)
+	add t3, t0, t3    # t3 = address of name[index]
+	fld fa0, 0(t3)    # load double into fa0
+	li a7, 3
+	ecall
+	
+	la t5, space
+	lw a0, (t5)
+	li a7, 4
+	ecall
+	addi t2, t2, 1
+	j loop
+	
+	done:
+	
 	jal ra, print_newline
 	jal end
-____FUNCTION___add:
-	addi sp, sp, -8
-	sw ra, 4(sp)     # save return address
-	sw a0, 0(sp)
-
-	
-la t0, ____PARAM____add_____0
-	lw t1 (t0)
-	la t2, x
-	sw t1 (t2)
-
-	
-la t0, ____PARAM____add_____1
-	lw t1 (t0)
-	la t2, y
-	sw t1 (t2)
-	.data
-	x: .word 0
-	.text
-	.data
-	y: .word 0
-	.text
-	la t0, x
-	lw t0, (t0)
-	la t1, y
-	lw t1, (t1)
-	bgt t0, t1, ____IF____protected___Conditional____1
-	call ____ELSE____protected___Conditional____1
-	____IF____protected___Conditional____1: 
-	la t1, x
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
-	ecall
-	jal ra, print_newline
-	lw ra, 4(sp) # restore ra
-	lw a0, 0(sp)
-	addi sp, sp, 8
-	ret
-	call ____AFTER____protected___Conditional____1
-	____ELSE____protected___Conditional____1: 
-	la t1, y
-	lw t2, 0(t1)
-	addi a0, t2, 0
-	li    a7, 1
-	ecall
-	jal ra, print_newline
-	____AFTER____protected___Conditional____1: 
-	.data
-	pstr0: .asciz "done"
-	.text
-	la    a0, 	pstr0
-	li    a7, 4
-	ecall
-
-	jal ra, print_newline
-	lw ra, 4(sp) # restore ra
-	lw a0, 0(sp)
-	addi sp, sp, 8
-	ret
 
 print_newline:
 	addi sp, sp, -8

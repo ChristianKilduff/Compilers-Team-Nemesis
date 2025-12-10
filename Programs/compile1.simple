@@ -1,15 +1,5 @@
-define void add(int x, int y) {
-    is x greater than y {
-        print x
-        return
-    } if not {
-        print y
-    }
+list = [0.0]
 
-    print "done"
-}
+add 3.0 to list
 
-add(1,11)
-
-
-print "hello"
+print list

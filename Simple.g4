@@ -253,7 +253,7 @@ grammar Simple;
   Map<String, RiscArray> ARRAYS = new HashMap();
 
   RiscArray generateArray(String name, String type, String ... values) {
-      RiscArray arr  = new RiscArray(type);
+      RiscArray arr  = new RiscArray(name, type);
       ARRAYS.put(name, arr);
       for(String v : values) {
         arr.add(v, false);
@@ -264,59 +264,155 @@ grammar Simple;
 
   int array_count = 0;
   class RiscArray {
-    ArrayList<String> variables = new ArrayList<String>();;
+    String name;
     int c = array_count++;
     int i = 0;
     String type;
+    String sizeVarName;
 
-    public RiscArray(String type) {
+    public RiscArray(String name, String type) {
+      this.name = name;
       this.type = type;
+	      i=array_count++;
+        sizeVarName = "count_arr_"+i;
+        
+        int size = 400;
+        if(type.equals(Types.DOUBLE)) size *=2;
+	      addCodeLine(".data"
+          + "\n\t" + name + ": .space 400"
+          + "\n\t" + sizeVarName +":   .word 0"
+          + "\n\t.text\n");
     }
 
-    void add(String value, boolean isVar) {
-      if(isVar) {
-        variables.add(value);
-        return;
-      }
-      String varName = "____ARRAY" + c + "____ELEMENT____" + i;
-      i++;
-      variables.add(varName);
 
-      if(type.equals(Types.INT)) {
-        generateIntAssign(varName, value);
-      } else if(type.equals(Types.DOUBLE)) {
-        generateDoubleAssign(varName, value);
-      } else if(type.equals(Types.STRING)) {
-        generateStringAssign(varName, value);
-      } 
-    }
-    int size() {
-      return this.variables.size();
+    void add(String value, boolean isVar) {     
+
+	      String code = "\n\t#====\n\t" +
+        "la t0, " + sizeVarName // t0 = size address
+        + "\n\tlw t1, 0(t0)"; // t1 = curr size
+
+        int mul = type.equals(Types.DOUBLE) ? 3 : 2;
+        code += "\n\tla t2, " + name  // t2 = array address
+        + "\n\tslli t3, t1, " + mul // t3 = t1 * 4 (get the position of next avail slot)
+        + "\n\tadd t3, t2, t3"; //t3 = address of arr[i]
+
+       
+       if(isVar) {
+        code += "\n\tla t4, " + value; // t4 = address of value
+        if(type.equals(Types.DOUBLE))
+          code += "\n\tfld fa0, (t4)";
+        else 
+          code += "\n\tlw t4, (t4)"; // t4 = value
+
+       } else {
+        if (type.equals(Types.DOUBLE)) {
+          String tmpDoubleName = "double____" + data_count++;
+          code += "\n\t.data\n\t" + tmpDoubleName + ": .double " + value + "\n\t.text";
+          code += "\n\tla t4, " + tmpDoubleName ;// t4 = tmp address
+          code += "\n\tfld fa0, 0(t4)";
+        } else {
+	        code += "\n\tli t4, " + value; // t4 = value to add
+        }
+       }
+
+       if(type.equals(Types.DOUBLE))
+        code+= "\n\tfsd fa0, 0(t3)";  // store into arr
+       else
+        code+= "\n\tsw t4, 0(t3)";  // store into arr
+
+        code += "\n\taddi t1, t1, 1" // incr count
+        + "\n\tla t0, " + sizeVarName // t0 = count address
+        + "\n\tsw t1, 0(t0)"; // update count
+        
+        code += "\n\t#_____\n\t";
+
+        addCodeLine(code);
+      
     }
 
-    void set(int index, String value, boolean isVar) {
-      if(isVar) {
-        variables.set(index, value);
-        return;
-      }
-      String varName = variables.get(index);
-      if(type.equals(Types.INT)) {
-        reassignInt(varName, value);
-      } else if(type.equals(Types.DOUBLE)) {
-        reassignDouble(varName, value);
-      } else if(type.equals(Types.STRING)) {
-        reassignString(varName, value);
-      }
+    void assignSize(String varName) {
+	      assignVarToVar(varName, sizeVarName, Types.INT);
+    }
+    
+    void set(int index, String value, boolean isIndexVar, boolean isValueVar) {
+      
+        String code = "";
+
+        if(isIndexVar) {
+          code+="la t0, " + index // t0 = size address
+        + "\n\tlw t1, (t0)" // t1 = index
+        + "\n\taddi t1, -1"; // t1 - 1
+        } else {
+          code+="li t1, " + index;
+        }
+
+        code += "\n\tla t2, " + name  // t2 = array address
+        + "\n\tslli t3, t1, 2" // t3 = t1 * 4 (get the position of next avail slot)
+        + "\n\tadd t3, t2, t3"; //t3 = address of arr[i]
+
+       
+        code += "\n\tlw t4, " + value // t4 = value to add
+        + "\n\tsw t4, 0(t3)";  // store into arr
+
+
+        addCodeLine(code);
     }
 
 
     void remove(int index) {
-      variables.remove(index);
+      
     }
 
     void clear() {
-      variables.clear();
+      // just set size to 0
+      String code = "\n\tli t1, 0" // incr count
+      + "\n\tla t0, " + sizeVarName // t0 = count address
+      + "\n\tsw t1, 0(t0)"; // update count
+      addCodeLine(code);
     }
+
+    // all ai
+    void print() {
+        String code = 
+            "\n\tla t0, " + name + "\n\t" // arr address (t0)
+            + "lw t1, " + sizeVarName  + "\n\t" // size of array (t1)
+            + "li t2, 0 \n\t" // index (t2)
+            + "\n\t"
+            + "loop:\n\t"
+            + "bge t2, t1, done  # if index >= count, exit loop\n\t"; // loop while index < count
+
+        if (type.equals(Types.DOUBLE)) {
+            // For double
+            code += 
+                "slli t3, t2, 3    # t3 = index * 8 (double size)\n\t" +
+                "add t3, t0, t3    # t3 = address of name[index]\n\t" +
+                "fld fa0, 0(t3)    # load double into fa0\n\t" +
+                "li a7, 3\n\t" +   // RARS syscall 2 = print double
+                "ecall\n\t";
+        } else {
+            // For .word (integer)
+            code += 
+                "slli t3, t2, 2    # t3 = index * 4 (word size)\n\t" +
+                "add t3, t0, t3    # t3 = address of arr[index]\n\t" +
+                "lw a0, 0(t3)      # load integer into a0\n\t" +
+                "li a7, 1\n\t" +   // RARS syscall 1 = print integer
+                "ecall\n\t";
+        }
+        code += "\n\tla t5, space"  
+              + "\n\tlw a0, (t5)"
+              + "\n\tli a7, 4"     
+              + "\n\tecall\n\t";
+        // Increment index and loop
+        code += 
+            "addi t2, t2, 1\n\t" +
+            "j loop\n\t" +
+            "\n\t" +
+            "done:\n\t";
+
+        addCodeLine(code);
+    }
+
+
   }
 
   boolean doesVariableExist(String varName) {
@@ -451,7 +547,7 @@ grammar Simple;
   void generateStringAssign(String name, String value) {
     String tmpN = name + "_tmp____protected";
     String s = ".data" 
-		  + "\n\t" + tmpN + ": .asciz " + value
+      + "\n\t" + tmpN + ": .asciz " + "\"" + value + "\""
       + "\n\t" + name + ": .word " + tmpN
 	    +"\n\t.text";
     addCodeLine(s);
@@ -494,13 +590,16 @@ grammar Simple;
   void writeFile() {
     try (PrintWriter pw = new PrintWriter("SimpleProgram.S", "UTF-8")) {
       setScope("globalVars");
+      generateInitialAssign("space", " ", Types.STRING);
       for(Identifier var : globalVariables) {
         generateInitialAssign(var.id, "0", var.type);
       }
       exitMainScope();
-      for(String line : codeBlockLines.get("globalVars")) {
-            pw.print("\t"+line + "\n");
-        } 
+
+      ArrayList<String> vars = codeBlockLines.get("globalVars");
+      if(vars != null)
+        for(String line : vars) 
+              pw.print("\t"+line + "\n");
 
       codeBlockLines.remove("globalVars");
 
@@ -512,7 +611,6 @@ grammar Simple;
         }
       }
       pw.print(sb.toString());
-      // pw.print("public static void main(String[] args) throws Exception {\n");
       for(String line : globalCodeLines) {
           sb2.append("\t"+line + "\n");
       } 
@@ -554,7 +652,8 @@ grammar Simple;
 		    + "\n\tecall        # Execute the system call to exit"
     );
     } catch (Exception e) {
-      System.err.println("error: failed to write SimpleProgram.java: " + e.getMessage());
+      e.printStackTrace();
+      System.err.println("error: failed to write SimpleProgram: " + e.getMessage());
     }
 
   }//}
@@ -576,7 +675,7 @@ grammar Simple;
     }
 
     void addLoopCall() {
-      addCodeLine("call " + loopBlocks.peek());
+      addCodeLine("j " + loopBlocks.peek());
     }
 
     boolean isInLoop() {
@@ -682,10 +781,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
           } else if(type.equals(Types.ARRAY)) {
             RiscArray arr = ARRAYS.get(name);
             if(arr != null) {
-              for(String varName : arr.variables) {
-                printVar(varName, arr.type);
-                addPrintLine(" ");
-              }
+              arr.print();
             }
           }
   }
@@ -722,14 +818,21 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
     addCodeLine(code);
   }
 
+  String upRa() {
+	    return "\n\taddi sp, sp, -8"
+    + "\n\tsw ra, 4(sp)     # save return address"
+    + "\n\tsw a0, 0(sp)\n";
+  }
 
+  String downRa() {
+    return "lw ra, 4(sp) # restore ra"
+    + "\n\tlw a0, 0(sp)"
+    + "\n\taddi sp, sp, 8";
+  }
   String getFunctionInitCode(String fName) {
     FunctionIdentifier fid = getFunction(fName);
     // block and return address code
-    String code = fid.block_name + ":"
-    + "\n\taddi sp, sp, -8"
-    + "\n\tsw ra, 4(sp)     # save return address"
-    + "\n\tsw a0, 0(sp)\n";
+    String code = fid.block_name + ":" + upRa();
 
     // set params
     for(int i = 0; i < fid.arity; i++) {
@@ -745,14 +848,15 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
 
 
   void addReturnVoidCall() {
-	  addCodeLine("lw ra, 4(sp) # restore ra"
-    + "\n\tlw a0, 0(sp)"
-    + "\n\taddi sp, sp, 8");
+	  addCodeLine(downRa());
 
     addCodeLine("ret");
   }
 
   ArrayList<Identifier> globalVariables = new ArrayList<Identifier>();
+
+
+  int clone_count = 0;
 }
 
 prog:
@@ -837,7 +941,6 @@ assignment
       }
       if(doAssign){
           if(newID == null) { // if not already exists create new var
-
                 String assignmentString = "";
                 if($isVar) {
                   String v = "";
@@ -851,7 +954,6 @@ assignment
                   generateAssignOrReassign($name.getText(), $value, $typeOf);
                 }
                 newID = createVariable($name.getText(), $value, $typeOf);
-
           } else { // if already exists then reassign
 	          if($isVar) {
 	              assignVarToVar(newID.id, $v.getText(), $typeOf);
@@ -976,12 +1078,13 @@ append_to_array:
       error($n, "Error array does not exist");
     } else {
     if($v.typeOf.equals(Types.VARIABLE)) {
+
       Identifier var = getVariable($v.asText);
       if(!var.type.equals(arr.type)) {
         error($n, "var type does not match array type");
-        } else {
-          arr.add($v.asText, true);
-        }
+      } else {
+        arr.add($v.asText, true);
+      }
       } else if(!$v.typeOf.equals(arr.type) || $v.isExpression) {
         error($n, "type of array does not match input");
       } else {
@@ -996,34 +1099,32 @@ array_length:
       if(ARRAYS.get($n.getText()) == null) {
         error($n, "Error array does not exist");
       } else if(var == null) {
-          int size = ARRAYS.get($n.getText()).size();
-          createVariable($v.getText(), size+"", Types.INT);
-          generateIntAssign($v.getText(), size+"");
+          createVariable($v.getText(), "0", Types.INT);
+          // generateIntAssign($v.getText(), size+"");
+          ARRAYS.get($n.getText()).assignSize($v.getText());
       } else if(var.type != Types.INT) {
         error($v, "Can only assign length of array to an int");
       }else {
-            int size = ARRAYS.get($n.getText()).size();
-            reassignInt($v.getText(), size+"");
+            // int size = ARRAYS.get($n.getText()).size();
+            // reassignInt($v.getText(), size+"");
+            ARRAYS.get($n.getText()).assignSize($v.getText());
       }
   };
 replace_index_array
-	locals[int index]:
+	locals[int index, boolean isIndexVar]:
 	'replace index ' (
 		i = INT {
         $index = Integer.parseInt($i.getText()) - 1;
 	  }
 		| i_v = VARIABLE_NAME {
-	      // TODO
+		    $isIndexVar = true;
     }
-	) ' with ' v = VARIABLE_NAME ' from ' n = VARIABLE_NAME {
+	) ' with ' v = varExprOrType ' from ' n = VARIABLE_NAME {
     RiscArray arr = ARRAYS.get($n.getText());
-   
     if(arr == null) {
       error($n, "Error array does not exist");
-    } else if($index >= arr.size() || $index < 0) {
-        error($n, "Index out of bounds");
     } else {
-      arr.set($index, $v.getText(), true);
+      arr.set($index, $v.asText, $isIndexVar, $v.isVar);
     }
 };
 remove_from_array
@@ -1040,8 +1141,6 @@ remove_from_array
    
     if(arr == null) {
       error($n, "Error array does not exist");
-    } else if($index >= arr.size() || $index < 0) {
-        error($n, "Index out of bounds");
     } else {
       arr.remove($index);
     }
@@ -1084,7 +1183,8 @@ get_from_array
               generateStringAssign(newID.id, "");
             }
         } 
-          assignVarToVar(newID.id, arr.variables.get($index), arrType);
+        // TODO
+          // assignVarToVar(newID.id, arr.variables.get($index), arrType);
       }
     }
 };
@@ -1369,25 +1469,37 @@ if_else
   };
 
 for_statement
-	returns[String repeats, String start_block_name, String loop_block_name, String return_to_block]
-		:
-	'repeat' (n = INT | n = VARIABLE_NAME) {
-      $repeats = $n.getText();
-      $loop_block_name="______protected___loop____" + loop_index++;
-      $start_block_name = "____start" + $loop_block_name;
+	returns[String loop_block_name, String return_to_block, String i_name]
+	locals[String repeat_assign_code]:
+	'repeat' (
+		n = INT {
+      $repeat_assign_code = "li t1, " + $n.getText();
+  }
+		| v = VARIABLE_NAME {
+	    $repeat_assign_code = "la t2, " + $v.getText()
+      + "\n\tlw t1, (t2)";
+  }
+	) {
+	    loop_index++;
+      $loop_block_name="______protected___loop____" + loop_index;
       $return_to_block = "____return_from" + $loop_block_name;
-
+      $i_name = "____loop_index____" +loop_index;
+      
+      // init "i"
+      generateInitialAssign($i_name, "0", Types.INT);
+      // set i to be the num repeats
+      addCodeLine("la t0, " + $i_name);
+      addCodeLine($repeat_assign_code);
+      addCodeLine("sw t1, (t0)");
       enterLoop($loop_block_name, $return_to_block);
-
-      call($loop_block_name);
-      addCodeLine($start_block_name + ": ");
-	    addCodeLine("\tli t0, 0 # stores in t0 which may and likely will overide other things");
-      call($loop_block_name);
       
       addCodeLine($loop_block_name + ":");
-      addCodeLine("li t1, " + $repeats);
-      addCodeLine("addi t0, t0, 1");
-      addCodeLine("bgt t0, t1, "+ $return_to_block);
+      addCodeLine("la t0, " + $i_name); // get i address (t0)
+      addCodeLine("lw t1, (t0)"); // load i number (t1)
+      addCodeLine("beqz t1, "+ $return_to_block);
+
+      addCodeLine("addi t1, t1, -1"); // -1
+      addCodeLine("sw t1, (t0)"); // store back to i
   } loopScope {
       addLoopCall();
       addCodeLine($return_to_block + ":");
@@ -1429,7 +1541,8 @@ functionDefinition
 	returns[String name, int arity, boolean doesReturn, String returnType, String value]
 	locals[ArrayList<String> variableParamNames, ArrayList<String> varTypeAndName, String varType, String s, ArrayList<String> paramTypes, ArrayList<String> paramTypes]
 		:
-	'define' r = VARIABLE_NAME {
+	'define' {$returnType = "void";} (
+		r = VARIABLE_NAME {
     $returnType = $r.getText();
     if($returnType.startsWith("list")) {
         String arrayType = $returnType.split("_")[1].toLowerCase();
@@ -1445,7 +1558,8 @@ functionDefinition
         } if($returnType.equals("string")) {
           $returnType = Types.STRING;
         }
-  } n = VARIABLE_NAME {
+  }
+	)? n = VARIABLE_NAME {
     $name = $n.getText();
 	  $variableParamNames = new ArrayList<String>();
     $varTypeAndName = new ArrayList<String>();
@@ -1673,9 +1787,9 @@ output
 };
 
 varExprOrType
-	returns[String asText, String typeOf, boolean isExpression]:
+	returns[String asText, String typeOf, boolean isExpression, boolean isVar]:
 	(
-		t = VARIABLE_NAME {$typeOf=Types.VARIABLE;}
+		t = VARIABLE_NAME {$typeOf=Types.VARIABLE; $isVar=true;}
 		| t = STRING {$typeOf=Types.STRING;}
 		| t = BOOL {$typeOf=Types.BOOL;}
 	) {
