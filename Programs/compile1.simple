@@ -1,3 +1,5 @@
-i = 0.0
+a = 5.0
+b = 1.0
+r = a multiply b
 
-print i
+print r

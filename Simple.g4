@@ -857,6 +857,20 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
 
 
   int clone_count = 0;
+
+
+  void multiplyDoubleVars(String var, String f1, String f2) {
+    addCodeLine("la t0, " + var);
+    addCodeLine("la t1, " + f1);
+    addCodeLine("la t2, " + f2);
+
+    addCodeLine("fld fa0, (t0)");
+    addCodeLine("fld fa1, (t1)");
+    addCodeLine("fld fa2, (t2)");
+
+    addCodeLine("fmul.d fa2, fa0, fa1");
+    addCodeLine("fsd fa2, (t0)");
+  }
 }
 
 prog:
@@ -1201,9 +1215,10 @@ square_root
       $hasKnownValue = $e.hasKnownValue;
     };
 expr
-	returns[boolean hasKnownValue, float value, String exprString, String typeOf, boolean isExpression]
+	returns[boolean hasKnownValue, float value, String exprString, String typeOf, boolean isExpression, String f1, String sign, String f2]
 		:
 	a = word {
+      $f1 = $a.value + "";
 	    $isExpression = $a.isExpression;
       $exprString = $a.exprString;
       $typeOf = $a.isDouble ? Types.DOUBLE : Types.INT;
@@ -1215,6 +1230,7 @@ expr
       } 
     } (
 		op = ('plus' | 'minus') b = word {
+      $f2 = $b.value + "";
       if($b.isDouble) {
         $typeOf = Types.DOUBLE;
       }
