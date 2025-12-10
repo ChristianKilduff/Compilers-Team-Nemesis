@@ -1,13 +1,16 @@
-ret_list = [0.0]
+param_list = [0.0]
 
-degin read_array(int n) {
-    clear ret_list
+define read_array(int n) {
+    clear param_list
+
+    print "Input " inline
+    print n inline
+    print " doubles:"
     repeat n {
         i = 0.0
         input decimal i
-        add i to ret_list
+        add i to param_list
     }
 }
-
 read_array(4)
-print ret_list
+print param_list
