@@ -1,7 +1,15 @@
-list=[1.0,2.2,3.0]
+define void add(int x, int y) {
+    is x greater than y {
+        print x
+        return
+    } if not {
+        print y
+    }
 
-i=2
-assign x index i from list
+    print "done"
+}
 
-print list
-print x
+add(1,11)
+
+
+print "hello"
