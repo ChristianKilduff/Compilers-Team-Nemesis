@@ -7,8 +7,8 @@ factor: .double 5.0       # Constant factor
 main:
     # Load x and factor
     la t0, x
-    fld fa0, (t0)           # fa0 = x
     la t1, factor
+    fld fa0, (t0)           # fa0 = x
     fld fa1, (t1)         # fa1 = 5.0
 
     # Multiply x * factor

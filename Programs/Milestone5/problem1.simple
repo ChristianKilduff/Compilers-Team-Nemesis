@@ -10,8 +10,11 @@ input number rent
 input number food
 input number fun
 
-total = rent plus food plus fun
-savings = income minus total
+total = rent plus food
+total = total plus fun
+n = -1
+tm = total multiply n
+savings = income plus tm
 
 print "Hello, " inline
 print name

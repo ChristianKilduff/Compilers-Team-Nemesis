@@ -859,17 +859,27 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
   int clone_count = 0;
 
 
-  void multiplyDoubleVars(String var, String f1, String f2) {
-    addCodeLine("la t0, " + var);
-    addCodeLine("la t1, " + f1);
-    addCodeLine("la t2, " + f2);
+  void addDoubleVars(String var, String f1, String f2) {
+    addCodeLine("la t2, " + var);
+    addCodeLine("la t0, " + f1);
+    addCodeLine("la t1, " + f2);
 
-    addCodeLine("fld fa0, (t0)");
-    addCodeLine("fld fa1, (t1)");
-    addCodeLine("fld fa2, (t2)");
+    addCodeLine("\n\tfld fa0, 0(t0)");
+    addCodeLine("fld fa1, 0(t1)");
+
+    addCodeLine("fadd.d fa2, fa0, fa1");
+    addCodeLine("fsd fa2, (t2)");
+  }
+  void multiplyDoubleVars(String var, String f1, String f2) {
+    addCodeLine("la t2, " + var);
+    addCodeLine("la t0, " + f1);
+    addCodeLine("la t1, " + f2);
+
+    addCodeLine("\n\tfld fa0, 0(t0)");
+    addCodeLine("fld fa1, 0(t1)");
 
     addCodeLine("fmul.d fa2, fa0, fa1");
-    addCodeLine("fsd fa2, (t0)");
+    addCodeLine("fsd fa2, (t2)");
   }
 }
 
@@ -892,7 +902,7 @@ prog:
 	  };
 
 assignment
-	locals[String value, String typeOf, boolean isError, boolean isVar]:
+	locals[String value, String typeOf, boolean isError, boolean isVar, boolean isExpr]:
 	name = VARIABLE_NAME '=' (
 		t = DECIMAL {
       $typeOf = Types.DOUBLE;
@@ -933,8 +943,7 @@ assignment
         System.out.println("expression: " + $e.exprString);
       // can check if contains a decimal but doesnt check types of variables
       $typeOf = $e.typeOf;
-      // $value = String.valueOf($e.value);
-      $value=$e.exprString;
+      $isExpr = $e.isExpression;
     }
 	) {
     if(!$isError) {
@@ -962,7 +971,16 @@ assignment
                   else if($typeOf.equals(Types.INT)) v = "0";
                   generateAssignOrReassign($name.getText(), v, $typeOf);
                   assignVarToVar($name.getText(), $v.getText(), $typeOf);
-                } else if($typeOf.equals(Types.ARRAY)) {
+                } else if($isExpr) {
+                  generateAssignOrReassign($name.getText(), "0", $typeOf);
+                  System.out.println($e.sign);
+                  multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
+                  if($e.sign.equals("multiply"))
+                    multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
+                  else if($e.sign.equals("plus"))
+                    addDoubleVars($name.getText(), $e.f1, $e.f2);
+
+                }else if($typeOf.equals(Types.ARRAY)) {
                     generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
                 } else {
                   generateAssignOrReassign($name.getText(), $value, $typeOf);
@@ -1218,7 +1236,11 @@ expr
 	returns[boolean hasKnownValue, float value, String exprString, String typeOf, boolean isExpression, String f1, String sign, String f2]
 		:
 	a = word {
-      $f1 = $a.value + "";
+      $f1 = $a.left;
+      $sign = $a.sign;
+      $f2 = $a.right;
+
+
 	    $isExpression = $a.isExpression;
       $exprString = $a.exprString;
       $typeOf = $a.isDouble ? Types.DOUBLE : Types.INT;
@@ -1230,7 +1252,9 @@ expr
       } 
     } (
 		op = ('plus' | 'minus') b = word {
-      $f2 = $b.value + "";
+      // $f2 = $b.value + "";
+      $f2 = $b.left;
+      $sign = $op.getText();
       if($b.isDouble) {
         $typeOf = Types.DOUBLE;
       }
@@ -1238,21 +1262,22 @@ expr
 		      $exprString += $b.exprString;
           if ($hasKnownValue && $b.hasKnownValue)
             $value = $value + $b.value;
-          addCodeLine($exprString + "    fadd.d   ft0, ft0  ft1");
+          // addCodeLine($exprString + "    fadd.d   ft0, ft0  ft1");
         } else {
 		        $exprString += $b.exprString;
           if ($hasKnownValue && $b.hasKnownValue)
             $value = $value - $b.value;
-          addCodeLine($exprString + "    fsub.d   ft0, ft0  ft1");
+          // addCodeLine($exprString + "    fsub.d   ft0, ft0  ft1");
         }
 	  $isExpression = true;
     }
 	)*;
 
 word
-	returns[boolean hasKnownValue, float value, String exprString, boolean isDouble, boolean isExpression]
+	returns[boolean hasKnownValue, float value, String exprString, boolean isDouble, boolean isExpression, String left, String right, String sign]
 		:
 	a = factor {
+      $left = $a.factorString;
       $exprString = $a.factorString;
       $isDouble = $a.isDouble;
       if ($a.hasKnownValue) {
@@ -1261,12 +1286,15 @@ word
       } else $hasKnownValue = false;
     } (
 		op = ('multiply' | 'divide' | 'mod') b = factor {
+	      $sign = $op.getText();
+        $right = $b.factorString;
+        
         if($op.getText().equals("divide")) {
               $exprString += $b.factorString;
-              addCodeLine($exprString + "    fdiv.d   ft0, ft0  ft1");
+              // addCodeLine($exprString + "    fdiv.d   ft0, ft0  ft1");
 	        } else if($op.getText().equals("multiply")) {
               $exprString += $b.factorString;
-              addCodeLine($exprString + "    fmul.d   ft0, ft0  ft1");
+              // addCodeLine($exprString + "    fmul.d   ft0, ft0  ft1");
 	        } else if($op.getText().equals("mod")) {
               $exprString +=" % " + $b.factorString;
         } 
@@ -1279,9 +1307,9 @@ word
           $hasKnownValue = false;
         } else if ($hasKnownValue && $b.hasKnownValue) {
           if ($op.getText().equals("multiply")) {
-            $value = $value * $b.value;
+            // $value = $value * $b.value;
           } else if ($op.getText().equals("divide")){
-            $value = $value / $b.value;
+            // $value = $value / $b.value;
           }
         } else {
           $hasKnownValue = false;
@@ -1305,8 +1333,9 @@ factor
 		$factorString = ""+$DECIMAL.getText();
     }
 	| VARIABLE_NAME {
+		      $factorString = $VARIABLE_NAME.getText();
         String id = $VARIABLE_NAME.getText();
-	      $factorString = generateLoadId(id);
+	      // $factorString = generateLoadId(id);
         used.add(id);
         // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
         if (!doesVariableExist(id)) {
