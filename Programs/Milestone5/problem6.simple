@@ -1,0 +1,16 @@
+param_list = [0.0]
+
+define read_array(int n) {
+    clear param_list
+
+    print "Input " inline
+    print n inline
+    print " doubles:"
+    repeat n {
+        i = 0.0
+        input decimal i
+        add i to param_list
+    }
+}
+read_array(4)
+print param_list

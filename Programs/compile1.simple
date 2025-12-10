@@ -1,5 +1,3 @@
-x=5.5
+i = 0.0
 
-input decimal x
-
-print x
+print i
