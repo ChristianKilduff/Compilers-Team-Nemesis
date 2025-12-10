@@ -859,30 +859,66 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
   ArrayList<Identifier> globalVariables = new ArrayList<Identifier>();
 
 
-  int clone_count = 0;
 
 
-  void addDoubleVars(String var, String f1, String f2) {
+  void arithmeticDouble(String var, String f1, String f2, String sign) {
+    String op = "";
+    switch(sign) {
+      case "multiply":
+        op = "fmul.d";
+        break;
+      case "divide":
+        op = "fdiv.d";
+        break;
+	    case "plus":
+        op = "fadd.d";
+        break;
+	    case "minus":
+        op = "fsub.d";
+        break;
+      case "mod":
+        op = "frem.d";
+        break;
+    }
+
     addCodeLine("la t2, " + var);
     addCodeLine("la t0, " + f1);
     addCodeLine("la t1, " + f2);
 
-    addCodeLine("\n\tfld fa0, 0(t0)");
+    addCodeLine("fld fa0, 0(t0)");
     addCodeLine("fld fa1, 0(t1)");
 
-    addCodeLine("fadd.d fa2, fa0, fa1");
+    addCodeLine(op + " fa2, fa0, fa1");
     addCodeLine("fsd fa2, (t2)");
   }
-  void multiplyDoubleVars(String var, String f1, String f2) {
+  void arithmeticInt(String var, String f1, String f2, String sign) {
+    String op = "";
+    switch(sign) {
+      case "multiply":
+        op = "mul";
+        break;
+      case "divide":
+        op = "div";
+        break;
+	    case "plus":
+        op = "add";
+        break;
+	    case "minus":
+        op = "sub";
+        break;
+      case "mod":
+        op = "rem";
+        break;
+    }
     addCodeLine("la t2, " + var);
     addCodeLine("la t0, " + f1);
     addCodeLine("la t1, " + f2);
 
-    addCodeLine("\n\tfld fa0, 0(t0)");
-    addCodeLine("fld fa1, 0(t1)");
+    addCodeLine("lw t0, 0(t0)");
+    addCodeLine("lw t1, 0(t1)");
 
-    addCodeLine("fmul.d fa2, fa0, fa1");
-    addCodeLine("fsd fa2, (t2)");
+    addCodeLine(op + " t3, t0, t1");
+    addCodeLine("sw t3, (t2)");
   }
 }
 
@@ -976,13 +1012,12 @@ assignment
                   assignVarToVar($name.getText(), $v.getText(), $typeOf);
                 } else if($isExpr) {
                   generateAssignOrReassign($name.getText(), "0", $typeOf);
-                  multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
-                  System.out.println($e.sign);
-                  if($e.sign.equals("multiply"))
-                    multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
-                  else if($e.sign.equals("plus"))
-                    addDoubleVars($name.getText(), $e.f1, $e.f2);
 
+                  if($typeOf.equals(Types.DOUBLE))
+                    arithmeticDouble($name.getText(), $e.f1, $e.f2, $e.sign);
+                  else
+                    arithmeticInt($name.getText(), $e.f1, $e.f2, $e.sign);
+                  
                 }else if($typeOf.equals(Types.ARRAY)) {
                     generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
                 } else {
@@ -992,10 +1027,12 @@ assignment
           } else { // if already exists then reassign
 		          if($isExpr) {
                 System.out.println("test");
-	                if($e.sign.equals("multiply"))
-                    multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
-                  else if($e.sign.equals("plus"))
-                    addDoubleVars($name.getText(), $e.f1, $e.f2);
+		                
+                  if($typeOf.equals(Types.DOUBLE))
+                    arithmeticDouble($name.getText(), $e.f1, $e.f2, $e.sign);
+                  else
+                    arithmeticInt($name.getText(), $e.f1, $e.f2, $e.sign);
+                  
               }
             else if($isVar) {
                 assignVarToVar(newID.id, $v.getText(), $typeOf);
@@ -1249,7 +1286,6 @@ expr
       $f1 = $a.left;
       $sign = $a.sign;
       $f2 = $a.right;
-
 
 	    $isExpression = $a.isExpression;
       $exprString = $a.exprString;
