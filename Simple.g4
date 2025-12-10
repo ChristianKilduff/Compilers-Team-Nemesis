@@ -31,13 +31,23 @@ grammar Simple;
   class FunctionIdentifier {
     String name;
     int arity;
-    ArrayList<Identifier> Params;
+    ArrayList<String> paramTypes;
+    ArrayList<String> paramNames;
     boolean doesReturn;
     String returnType;
+    String block_name;
     ArrayList<String> code = new ArrayList<String>();
 
     void addLine(String line) {
       code.add(line);
+    }
+
+    String getParamRef(int index) {
+      return "____PARAM____" + name + "_____" + index;
+    }
+
+    void assignOrReassign(int index, String value) {
+      generateAssignOrReassign(getParamRef(index), value, paramTypes.get(index));
     }
   }
 
@@ -45,7 +55,7 @@ grammar Simple;
     if(isScopeGlobal()) {
 	      globalCodeLines.add(line);
     } else {
-        addToCodeBlock(getScope(),line);
+        addToCodeBlock(getScope(), line);
     }
   }
 
@@ -68,7 +78,7 @@ grammar Simple;
   }
 
   void addPrintNewLine() {
-		      addCodeLine("call print_newline");
+		      addCodeLine("jal ra, print_newline");
   }
 
   
@@ -81,13 +91,20 @@ grammar Simple;
     return functionTable.get(name);
   }
 
-
-  FunctionIdentifier createFunction(String name, int arity, boolean doesReturn, String returnType) {
+  FunctionIdentifier createFunction(String name, int arity, boolean doesReturn, String returnType, ArrayList<String> paramTypes, ArrayList<String> paramNames) {
     FunctionIdentifier fid = new FunctionIdentifier();
     fid.name = name;
     fid.arity = arity;
     fid.doesReturn = doesReturn;
     fid.returnType = returnType;
+    fid.paramTypes = paramTypes;
+    fid.paramNames = paramNames;
+
+    for(int i = 0; i < arity; i++) {
+      globalVariables.add(createGlobalScopeVariable(fid.getParamRef(i), "0", paramTypes.get(i)));
+    }
+
+    fid.block_name = "____FUNCTION___" + name;
     functionTable.put(name, fid);
     if(isDebug)
       System.out.println("Created func: name: " + name + " | arity: " + arity + " | doesReturn: " + doesReturn);
@@ -109,7 +126,9 @@ grammar Simple;
 // tracks variables by scope level, key is global/function name, arraylist is level of scope for loops/ifs
   class ScopedSymbolTable extends HashMap<String, ArrayList<SymbolTable>> {
 	    ScopedSymbolTable() {
-        put("Global", new ArrayList<SymbolTable>());
+        ArrayList<SymbolTable> l = new ArrayList<SymbolTable>();
+        l.add(new SymbolTable());
+        this.put("Global", l);
       }
   }
 
@@ -125,13 +144,10 @@ grammar Simple;
   int scopeLevel = 0;
   String currScope = "Global";
   
-  void setMainScope(String functionName) {
-    currScope = functionName;
-    scopedSymbolTable.put(functionName, new ArrayList<SymbolTable>());
-  }
 
   void setScope(String name) {
-	     currScope = name;
+	    currScope = name;
+	    scopedSymbolTable.put(name, new ArrayList<SymbolTable>());
   }
 
   void exitMainScope() {
@@ -170,11 +186,12 @@ grammar Simple;
   
 
   SymbolTable getCurrSymbolTableAtCurrLevel() {
-	    ArrayList<SymbolTable> tables = scopedSymbolTable.get(getScope());
-      if(tables.size() == 0) {
-        tables.add(new SymbolTable());
-      }
-      return tables.get(tables.size() - 1);
+      return scopedSymbolTable.get("Global").get(0);
+	    // ArrayList<SymbolTable> tables = scopedSymbolTable.get(getScope());
+      // if(tables.size() == 0) {
+      //   tables.add(new SymbolTable());
+      // }
+      // return tables.get(tables.size() - 1);
   }
 
   Identifier createVariable(String name, String value, String type) {
@@ -188,6 +205,22 @@ grammar Simple;
     id.type = type;
     id.scope = currScope;
     id.scopeLevel = getScopeLevel();
+	  getCurrSymbolTableAtCurrLevel().put(name, id);
+
+    return id;
+  }
+
+	  Identifier createGlobalScopeVariable(String name, String value, String type) {
+    // if variable already exists in global or curr scope then cannot assign; return null
+    if(getVariable(name) != null) {
+      return null;
+    }
+    Identifier id = new Identifier();
+    id.id = name;
+    id.value = value;
+    id.type = type;
+    id.scope = "Global";
+    id.scopeLevel = 0;
 	  getCurrSymbolTableAtCurrLevel().put(name, id);
 
     return id;
@@ -353,14 +386,34 @@ grammar Simple;
     addCodeLine("fld fa0, (t0)");
   }
 
-  void generateAssign(String name, String value, String type) {
+  void generateAssignOrReassign(String name, String value, String type) {
 		    if(type.equals(Types.DOUBLE)) {
-          generateDoubleAssign(name, value);
+          if(doesVariableExist(name))
+            reassignDouble(name, value);
+          else
+            generateDoubleAssign(name, value);
         } 
         else if(type.equals(Types.INT)) {
-          generateIntAssign(name, value);
+	        if(doesVariableExist(name))
+            reassignInt(name, value);
+          else
+            generateIntAssign(name, value);
         } else if(type.equals(Types.STRING)) {
-          generateStringAssign(name, value);
+	        if(doesVariableExist(name))
+            reassignString(name, value);
+          else
+            generateStringAssign(name, value);
+        } 
+  }
+
+	  void generateInitialAssign(String name, String value, String type) {
+		    if(type.equals(Types.DOUBLE)) {
+            generateDoubleAssign(name, value);
+        } 
+        else if(type.equals(Types.INT)) {
+            generateIntAssign(name, value);
+        } else if(type.equals(Types.STRING)) {
+            generateStringAssign(name, value);
         } 
   }
 
@@ -440,6 +493,18 @@ grammar Simple;
 
   void writeFile() {
     try (PrintWriter pw = new PrintWriter("SimpleProgram.S", "UTF-8")) {
+      setScope("globalVars");
+      for(Identifier var : globalVariables) {
+        generateInitialAssign(var.id, "0", var.type);
+      }
+      exitMainScope();
+      for(String line : codeBlockLines.get("globalVars")) {
+            pw.print("\t"+line + "\n");
+        } 
+
+      codeBlockLines.remove("globalVars");
+
+
       for(int i=0; i<functionList.size(); i++) {
         FunctionIdentifier fid = functionList.get(i);
         for(String line : fid.code) {
@@ -458,22 +523,32 @@ grammar Simple;
 	      pw.print(
 	    "\tjal end\n");
 
-	      for(String key : codeBlockLines.keySet()) {
-          pw.print(key + ": \n");
+      for(String key : codeBlockLines.keySet()) {
+	          pw.print(getFunctionInitCode(key));
           for(String line : codeBlockLines.get(key)) {
             pw.print("\t"+line + "\n");
         } 
       }
 
-      pw.print("\nprint_newline:"
-	    + "\n\tli    a0, '\\n'"
-		    + "\n\tli    a7, 11"
-		    + "\n\tecall"
-		    + "\n\tret"
+      pw.print("\nprint_newline:");
 
-		    + "\nend:\n"
+	    pw.print("\n\taddi sp, sp, -8"
+        + "\n\tsw ra, 4(sp)     # save return address"
+        + "\n\tsw a0, 0(sp)     # save n");
+     
+      pw.print(
+	    "\n\tli    a0, '\\n'"
+		    + "\n\tli    a7, 11"
+		    + "\n\tecall");
+
+      pw.print("\n\tlw ra, 4(sp)       # restore ra"
+        + "\n\tlw a0, 0(sp)"
+        + "\n\taddi sp, sp, 8"
+		    + "\n\tret");
+
+		    pw.print("\nend:\n"
         + "\t# print new line\n"
-        +"\tcall print_newline\n"
+        +"\tjal ra, print_newline\n"
 		    + "\n\tli    a0, 0     # Load the exit code (e.g., 0 for success) into a0"
 		    + "\n\tli    a7, 93    # Load the Exit2 syscall number into a7"
 		    + "\n\tecall        # Execute the system call to exit"
@@ -574,7 +649,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
   Stack<String> loopReturnBlocks = new Stack<String>();
 
   void call(String name) {
-    addCodeLine("call " + name);
+    addCodeLine("jal ra, " + name);
   }
 
 
@@ -614,21 +689,70 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
             }
           }
   }
+	  String getAssignVarToVar(String toAssign, String assignFrom, String type) {
+      String code = "\n";
+      if(type.equals(Types.INT) | type.equals(Types.STRING)) {
+        code += "la t0, " + assignFrom 
+        + "\n\tlw t1 (t0)" 
+        + "\n\tla t2, " + toAssign 
+        + "\n\tsw t1 (t2)\n";
+      } else if(type.equals(Types.DOUBLE)) {
+        code += "la t0, " + assignFrom 
+        + "\n\tfld fa0 (t0)" 
+        + "\n\tla t2, " + toAssign 
+        + "\n\tfsd fa0 (t2)\n";
+      }
 
+      return code;
+  }
   void assignVarToVar(String toAssign, String assignFrom, String type) {
+    String code = "";
     if(type.equals(Types.INT) | type.equals(Types.STRING)) {
-      addCodeLine("la t0, " + assignFrom 
+      code = "la t0, " + assignFrom 
       + "\n\tlw t1 (t0)" 
       + "\n\tla t2, " + toAssign 
-      + "\n\tsw t1 (t2)");
+      + "\n\tsw t1 (t2)";
     } else if(type.equals(Types.DOUBLE)) {
-      addCodeLine("la t0, " + assignFrom 
+	    code = "la t0, " + assignFrom 
       + "\n\tfld fa0 (t0)" 
       + "\n\tla t2, " + toAssign 
-      + "\n\tfsd fa0 (t2)");
+      + "\n\tfsd fa0 (t2)";
     }
 
+    addCodeLine(code);
   }
+
+
+  String getFunctionInitCode(String fName) {
+    FunctionIdentifier fid = getFunction(fName);
+    // block and return address code
+    String code = fid.block_name + ":"
+    + "\n\taddi sp, sp, -8"
+    + "\n\tsw ra, 4(sp)     # save return address"
+    + "\n\tsw a0, 0(sp)\n";
+
+    // set params
+    for(int i = 0; i < fid.arity; i++) {
+      String var_name = fid.paramNames.get(i);
+      String param_name = fid.getParamRef(i);
+
+      code+="\n\t" + getAssignVarToVar(var_name, param_name, fid.paramTypes.get(i));
+    }
+
+
+    return code;
+  }
+
+
+  void addReturnVoidCall() {
+	  addCodeLine("lw ra, 4(sp) # restore ra"
+    + "\n\tlw a0, 0(sp)"
+    + "\n\taddi sp, sp, 8");
+
+    addCodeLine("ret");
+  }
+
+  ArrayList<Identifier> globalVariables = new ArrayList<Identifier>();
 }
 
 prog:
@@ -677,7 +801,7 @@ assignment
       if(var == null) {
           error($v, "Error variable " + $v.getText() + " does not exist");
           $isError = true;
-      } else if (var.scope != "global" && var.scope != getScope()) {
+      } else if (var.scope != "Global" && var.scope != getScope()) {
           error($v, "Error attempting to assign a variable that is not defined (there is a variable defined that is out of scope)");
           $isError = true;
       } else {
@@ -713,20 +837,20 @@ assignment
       }
       if(doAssign){
           if(newID == null) { // if not already exists create new var
-                newID = createVariable($name.getText(), $value, $typeOf);
 
                 String assignmentString = "";
                 if($isVar) {
                   String v = "";
                   if($typeOf.equals(Types.DOUBLE)) v = "0.0";
                   else if($typeOf.equals(Types.INT)) v = "0";
-                  generateAssign($name.getText(), v, $typeOf);
-                  assignVarToVar(newID.id, $v.getText(), $typeOf);
+                  generateAssignOrReassign($name.getText(), v, $typeOf);
+                  assignVarToVar($name.getText(), $v.getText(), $typeOf);
                 } else if($typeOf.equals(Types.ARRAY)) {
                     generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
                 } else {
-                  generateAssign($name.getText(), $value, $typeOf);
+                  generateAssignOrReassign($name.getText(), $value, $typeOf);
                 }
+                newID = createVariable($name.getText(), $value, $typeOf);
 
           } else { // if already exists then reassign
 	          if($isVar) {
@@ -822,6 +946,7 @@ statement:
         String b = $y.asText;
         if(isFunctionReturning == 1) {
           // addCodeLine("return " + $y.asText + ";");
+          System.out.println("Return values not implemented");
         } else {
           error($at, "Error: function does not return a value");
         }
@@ -833,6 +958,7 @@ statement:
       } {
         if(isFunctionReturning == 0) {
           // addCodeLine("return;");
+          addReturnVoidCall();
         } else {
           error($at, "Error: function must return a value");
         }
@@ -1301,89 +1427,74 @@ loopScope:
 
 functionDefinition
 	returns[String name, int arity, boolean doesReturn, String returnType, String value]
-	locals[ArrayList<String> variableParamNames, ArrayList<String> varTypeAndName, String varType, String s, ArrayList<String> paramJavaTypes]
+	locals[ArrayList<String> variableParamNames, ArrayList<String> varTypeAndName, String varType, String s, ArrayList<String> paramTypes, ArrayList<String> paramTypes]
 		:
 	'define' r = VARIABLE_NAME {
     $returnType = $r.getText();
     if($returnType.startsWith("list")) {
-		      String arrayType = $returnType.split("_")[1].toLowerCase();
-		        if(arrayType.equals("int")) {
-	          $returnType = "ArrayList<Integer>";
-	          } else if(arrayType.equals("boolean")) {
-	          $returnType = "ArrayList<Boolean>";
-		          } else if(arrayType.equals("double")) {
-	          $returnType = "ArrayList<Double>";
-	          } if(arrayType.equals("string")) {
-	          $returnType = "ArrayList<String>";
+        String arrayType = $returnType.split("_")[1].toLowerCase();
+          $returnType = Types.ARRAY;
+          if(arrayType.equals("int")) {}
+          else if(arrayType.equals("double")) {} 
+          if(arrayType.equals("string")) {}
+
+        } else if($returnType.equals("int")) {
+	        $returnType = Types.INT;
+        }else if($returnType.equals("double")) {
+          $returnType = Types.DOUBLE;
+        } if($returnType.equals("string")) {
+          $returnType = Types.STRING;
         }
-    }
   } n = VARIABLE_NAME {
     $name = $n.getText();
 	  $variableParamNames = new ArrayList<String>();
     $varTypeAndName = new ArrayList<String>();
-    $paramJavaTypes = new ArrayList<String>();
+    $paramTypes = new ArrayList<String>();
   } '(' (
 		VARIABLE_NAME {
       $varType = $VARIABLE_NAME.getText();
-      if ($varType.equals("list_double"))
-          $varType = "ArrayList<Double>";
-
-      if ($varType.equals("list_boolean"))
-          $varType = "ArrayList<Boolean>";
-
-      if ($varType.equals("list_int"))
-          $varType = "ArrayList<Integer>";
-
-      if ($varType.equals("list_string"))
-          $varType = "ArrayList<String>";
-      $paramJavaTypes.add($varType);
+        if ($varType.startsWith("list")){
+          $varType = Types.ARRAY;
+        }else if($varType.equals("int")) {
+          $varType = Types.INT;
+        }else if($varType.equals("double")) {
+          $varType = Types.DOUBLE;
+        } if($varType.equals("string")) {
+          $varType = Types.STRING;
+        }
+      $paramTypes.add($varType);
     } VARIABLE_NAME {
 		      $variableParamNames.add($VARIABLE_NAME.getText());
-          $varTypeAndName.add($varType + " " + $VARIABLE_NAME.getText());
-          for(int i=0; i< $varTypeAndName.size(); i++) {
-          if(i==($varTypeAndName.size()-1)) {
-            $s = $varTypeAndName.get(i);
-          } else {
-            $s += $varTypeAndName.get(i) + ", ";
-          }
-        }
     } (
 			',' VARIABLE_NAME {
         $varType = $VARIABLE_NAME.getText();
-        if ($varType.equals("list_double"))
-            $varType = "ArrayList<Double>";
+        if ($varType.startsWith("list")){
+          $varType = Types.ARRAY;
+        } else  if($varType.equals("int")) {
+          $varType = Types.INT;
+        }else if($varType.equals("double")) {
+          $varType = Types.DOUBLE;
+        } if($varType.equals("string")) {
+          $varType = Types.STRING;
+        }
 
-        if ($varType.equals("list_boolean"))
-            $varType = "ArrayList<Boolean>";
-
-        if ($varType.equals("list_int"))
-            $varType = "ArrayList<Integer>";
-
-        if ($varType.equals("list_string"))
-            $varType = "ArrayList<String>";
-
-        $paramJavaTypes.add($varType);
+        $paramTypes.add($varType);
       } VARIABLE_NAME {
 	        $variableParamNames.add($VARIABLE_NAME.getText());
-          $varTypeAndName.add($varType + " " + $VARIABLE_NAME.getText());
-        $s = "";
-        for(int i=0; i< $varTypeAndName.size(); i++) {
-          if(i==($varTypeAndName.size()-1)) {
-            $s += $varTypeAndName.get(i);
-          } else {
-            $s += $varTypeAndName.get(i) + ", ";
-          }
-        }
       }
 		)*
 	)? ')' '{' { 
     if(doesFunctionExist($name)) {
       error($n, "Error: function " + $name + "already Exists");
     } else {
-	    setMainScope($name);
+      $arity = $variableParamNames.size();
+		      FunctionIdentifier fid = createFunction($name, $arity, $doesReturn, $returnType, $paramTypes, $variableParamNames);
+      setScope(fid.name);
+
       for(int i = 0; i < $variableParamNames.size(); i++) {
         String varName = $variableParamNames.get(i);
-        String type = $paramJavaTypes.get(i);
+        String type = $paramTypes.get(i);
+        generateAssignOrReassign(varName, "0", type);
           if (type.startsWith("ArrayList") || type.startsWith("list")) {
               String arrayType = "";
               if(type.startsWith("list")) {
@@ -1406,7 +1517,7 @@ functionDefinition
             A_ID.arrayType = arrayType;
 	            
         } else {
-          createVariable(varName, "<FUNCTION_PARAM>", type);
+          createVariable(varName, "0", type);
         }
         if(isDebug) {
           System.out.println("Adding " + varName + " to " + $name + " scope");
@@ -1417,15 +1528,8 @@ functionDefinition
         isFunctionReturning = 1;
       } else {
         $doesReturn = false;
-	        isFunctionReturning = 0;
+        isFunctionReturning = 0;
       }
-      $arity = $variableParamNames.size();
-      createFunction($name, $arity, $doesReturn, $returnType);
-      if ($arity > 0) {
-        // addCodeLine("public static " + $returnType + " " + $name + "(" + $s + ") {"); // }
-      } else {
-        // addCodeLine("public static " + $returnType + " " + $name + "() {"); // }
-      } 
     }
     
 } (
@@ -1434,12 +1538,10 @@ functionDefinition
       error($n, "Error can't define function in a function");
     }
 	)* '}' {
-	  //$arity = $variableParamNames.size();
-    //createFunction($name, $arity, $doesReturn);
     functionList.add(getFunction($name));
-    //{
-    // addCodeLine("}");
     isFunctionReturning = -1;
+    addReturnVoidCall();
+    
     exitMainScope();
 };
 
@@ -1475,16 +1577,10 @@ functionCall
         $isSuccess = true;
       }
 
-      String paramString ="";
-	    if($arity >= 1) {
-	        paramString = $params.get(0);
-          for(int i = 1; i<$arity; i++){
-            paramString += "," + $params.get(i);
-          }
+      for(int i =0; i < $arity; i++) {
+        fid.assignOrReassign(i, $params.get(i));
       }
-      $code = $n.getText() + "(" +paramString + ");";
-      $value = $n.getText() + "(" +paramString + ")";
-      $asText = $n.getText() + "(" +paramString + ")";
+
         if($isAssignment) {
 	        Identifier ID = getVariable($variable.getText());
             if(ID == null) {
@@ -1494,7 +1590,9 @@ functionCall
               $code = ID.id + "=" + $code;
         }
       }
-        // addCodeLine($code);
+        
+        addCodeLine("jal " + fid.block_name);
+
     }
   };
 
