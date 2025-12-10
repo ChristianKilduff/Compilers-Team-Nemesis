@@ -18,26 +18,28 @@ while i less than n{
     i = i plus 1
 }
 
-mean = 0.0
+assign total index 0 from listA
 sum = 0.0
 assign min index 0 from listA
 assign max index 0 from listA
 
-i = 0
+i = 1
 
 while i less than n{
     assign sum index i from listA
+    total = total plus sum
 
-    is index i from listA less than min {
-        assign min index i from listA
-    } if not is listA[i] greater than max{
-        max = listA[i]
+    is sum less than min {
+        sum = min
+    } 
+    is sum greater than max {
+        sum = max
     }
 
     i = i plus 1
 }
 
-mean = sum divided by n
+mean = total divided by n
 
 above_mean = 0
 i = 0
