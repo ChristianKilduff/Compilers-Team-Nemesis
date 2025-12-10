@@ -10,14 +10,9 @@ input decimal rent
 input decimal food
 input decimal fun
 
-total = 0.0
 total = rent plus food
 total = total plus fun
-n = -1.0
-tm = 0.0
-tm = total multiply n
-savings = 0.0
-savings = income plus tm
+savings = income minus total
 
 print "Hello, " inline
 print name
