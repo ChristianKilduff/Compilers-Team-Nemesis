@@ -5,15 +5,18 @@ food = 0.0
 fun = 0.0
 
 input string name
-input number income
-input number rent
-input number food
-input number fun
+input decimal income
+input decimal rent
+input decimal food
+input decimal fun
 
+total = 0.0
 total = rent plus food
 total = total plus fun
-n = -1
+n = -1.0
+tm = 0.0
 tm = total multiply n
+savings = 0.0
 savings = income plus tm
 
 print "Hello, " inline

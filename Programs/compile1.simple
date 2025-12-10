@@ -1,5 +1,14 @@
-a = 5.0
-b = -1.0
-r = a multiply b
+name = ""
+income = 0.0
+rent = 0.0
+food = 0.0
+fun = 0.0
 
-print r
+input decimal rent
+input decimal food
+
+total = 0.0
+print rent
+print food
+total = rent plus food
+print total

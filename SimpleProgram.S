@@ -9,95 +9,193 @@
 
 main:
 	.data
-	list: .space 400
-	count_arr_1:   .word 0
+	income: .double 0.0
 	.text
+	.data
+	rate: .double 0.0
+	.text
+	.data
+	tax: .double 0.0
+	.text
+	.data
+	net: .double 0.0
+	.text
+	li a7, 7
+	ecall
+	la t0, income
+	fsd fa0 (t0)
+	la t0, income
+	fld fa0, (t0)
+	.data
+	tmp_d_______1: .double 10000.0
+	.text
+	la t0, tmp_d_______1
+	fld fa1, (t0)
+	flt.d t2, fa0, fa1
+	bnez t2, ____IF____protected___Conditional____1
+	call ____ELSE____protected___Conditional____1
+	____IF____protected___Conditional____1: 
+	.data
+	DOUBLE_1: .double 0.0
+	.text
+	la t0,DOUBLE_1
+	fld  fa0, (t0)
+	la t0, rate
+	fsd fa0, (t0)
+	la t0, rate
+	fld fa0, (t0)
+	call ____AFTER____protected___Conditional____1
+	____ELSE____protected___Conditional____1: 
+	la t0, income
+	fld fa0, (t0)
+	.data
+	tmp_d_______3: .double 40000.0
+	.text
+	la t0, tmp_d_______3
+	fld fa1, (t0)
+	flt.d t2, fa0, fa1
+	bnez t2, ____IF____protected___Conditional____2
+	call ____ELSE____protected___Conditional____2
+	____IF____protected___Conditional____2: 
+	.data
+	DOUBLE_3: .double 10.0
+	.text
+	la t0,DOUBLE_3
+	fld  fa0, (t0)
+	la t0, rate
+	fsd fa0, (t0)
+	la t0, rate
+	fld fa0, (t0)
+	call ____AFTER____protected___Conditional____2
+	____ELSE____protected___Conditional____2: 
+	la t0, income
+	fld fa0, (t0)
+	.data
+	tmp_d_______5: .double 80000.0
+	.text
+	la t0, tmp_d_______5
+	fld fa1, (t0)
+	flt.d t2, fa0, fa1
+	bnez t2, ____IF____protected___Conditional____3
+	call ____ELSE____protected___Conditional____3
+	____IF____protected___Conditional____3: 
+	.data
+	DOUBLE_5: .double 20.0
+	.text
+	la t0,DOUBLE_5
+	fld  fa0, (t0)
+	la t0, rate
+	fsd fa0, (t0)
+	la t0, rate
+	fld fa0, (t0)
+	call ____AFTER____protected___Conditional____3
+	____ELSE____protected___Conditional____3: 
+	.data
+	DOUBLE_6: .double 30.0
+	.text
+	la t0,DOUBLE_6
+	fld  fa0, (t0)
+	la t0, rate
+	fsd fa0, (t0)
+	la t0, rate
+	fld fa0, (t0)
+	____AFTER____protected___Conditional____3: 
+	____AFTER____protected___Conditional____2: 
+	____AFTER____protected___Conditional____1: 
+	.data
+	div: .double 0.01
+	.text
+	la t2, tax
+	la t0, rate
+	la t1, div
+	
+	fld fa0, 0(t0)
+	fld fa1, 0(t1)
+	fmul.d fa2, fa0, fa1
+	fsd fa2, (t2)
+	la t2, tax
+	la t0, tax
+	la t1, income
+	
+	fld fa0, 0(t0)
+	fld fa1, 0(t1)
+	fmul.d fa2, fa0, fa1
+	fsd fa2, (t2)
+	.data
+	n: .double -1.0
+	.text
+	.data
+	DOUBLE_7: .double 0.0
+	.text
+	la t0,DOUBLE_7
+	fld  fa0, (t0)
+	la t0, net
+	fsd fa0, (t0)
+	la t0, net
+	fld fa0, (t0)
+	la t2, net
+	la t0, tax
+	la t1, n
+	
+	fld fa0, 0(t0)
+	fld fa1, 0(t1)
+	fmul.d fa2, fa0, fa1
+	fsd fa2, (t2)
+	la t2, net
+	la t0, income
+	la t1, net
+	
+	fld fa0, 0(t0)
+	fld fa1, 0(t1)
+	fadd.d fa2, fa0, fa1
+	fsd fa2, (t2)
+	.data
+	pstr0: .asciz "income "
+	.text
+	la    a0, 	pstr0
+	li    a7, 4
+	ecall
 
-	
-	#====
-	la t0, count_arr_1
-	lw t1, 0(t0)
-	la t2, list
-	slli t3, t1, 3
-	add t3, t2, t3
-	.data
-	double____0: .double 0.0
-	.text
-	la t4, double____0
-	fld fa0, 0(t4)
-	fsd fa0, 0(t3)
-	addi t1, t1, 1
-	la t0, count_arr_1
-	sw t1, 0(t0)
-	#_____
-	
-	
-	#====
-	la t0, count_arr_1
-	lw t1, 0(t0)
-	la t2, list
-	slli t3, t1, 3
-	add t3, t2, t3
-	.data
-	double____1: .double 1.0
-	.text
-	la t4, double____1
-	fld fa0, 0(t4)
-	fsd fa0, 0(t3)
-	addi t1, t1, 1
-	la t0, count_arr_1
-	sw t1, 0(t0)
-	#_____
-	
-	
-	la t0, list
-	lw t1, count_arr_1
-	li t2, 0 
-	
-	loop_2:
-	bge t2, t1, done_2
-	slli t3, t2, 3    # t3 = index * 8 (double size)
-	add t3, t0, t3    # t3 = address of name[index]
-	fld fa0, 0(t3)    # load double into fa0
+	la t0, income
+	fld fa0, (t0)
 	li a7, 3
 	ecall
-	
-	la t5, space
-	lw a0, (t5)
-	li a7, 4
-	ecall
-	addi t2, t2, 1
-	j loop_2
-	
-	done_2:
-	
 	jal ra, print_newline
-	
-	li t1, 0
-	la t0, count_arr_1
-	sw t1, 0(t0)
-	
-	la t0, list
-	lw t1, count_arr_1
-	li t2, 0 
-	
-	loop_3:
-	bge t2, t1, done_3
-	slli t3, t2, 3    # t3 = index * 8 (double size)
-	add t3, t0, t3    # t3 = address of name[index]
-	fld fa0, 0(t3)    # load double into fa0
+	.data
+	pstr1: .asciz "rate "
+	.text
+	la    a0, 	pstr1
+	li    a7, 4
+	ecall
+
+	la t0, rate
+	fld fa0, (t0)
 	li a7, 3
 	ecall
-	
-	la t5, space
-	lw a0, (t5)
-	li a7, 4
+	jal ra, print_newline
+	.data
+	pstr2: .asciz "tax = "
+	.text
+	la    a0, 	pstr2
+	li    a7, 4
 	ecall
-	addi t2, t2, 1
-	j loop_3
-	
-	done_3:
-	
+
+	la t0, tax
+	fld fa0, (t0)
+	li a7, 3
+	ecall
+	jal ra, print_newline
+	.data
+	pstr3: .asciz "net = "
+	.text
+	la    a0, 	pstr3
+	li    a7, 4
+	ecall
+
+	la t0, net
+	fld fa0, (t0)
+	li a7, 3
+	ecall
 	jal ra, print_newline
 	jal end
 

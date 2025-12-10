@@ -458,16 +458,16 @@ grammar Simple;
   
 
   void generateDoubleAssign(String name, String value) {
+	    if(value == null) value = "0";
     String s = ".data"
     +"\n\t" + name  + ": .double "+value
     +"\n\t.text";
     addCodeLine(s);
-
-
   }
 
 
   void reassignDouble(String name, String value) {
+    if(value == null) value = "0";
 	    String dName="DOUBLE_" + data_count;
       data_count++;
       String new_double = ".data"
@@ -976,8 +976,8 @@ assignment
                   assignVarToVar($name.getText(), $v.getText(), $typeOf);
                 } else if($isExpr) {
                   generateAssignOrReassign($name.getText(), "0", $typeOf);
-                  System.out.println($e.sign);
                   multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
+                  System.out.println($e.sign);
                   if($e.sign.equals("multiply"))
                     multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
                   else if($e.sign.equals("plus"))
@@ -990,8 +990,15 @@ assignment
                 }
                 newID = createVariable($name.getText(), $value, $typeOf);
           } else { // if already exists then reassign
-	          if($isVar) {
-	              assignVarToVar(newID.id, $v.getText(), $typeOf);
+		          if($isExpr) {
+                System.out.println("test");
+	                if($e.sign.equals("multiply"))
+                    multiplyDoubleVars($name.getText(), $e.f1, $e.f2);
+                  else if($e.sign.equals("plus"))
+                    addDoubleVars($name.getText(), $e.f1, $e.f2);
+              }
+            else if($isVar) {
+                assignVarToVar(newID.id, $v.getText(), $typeOf);
             } else if($typeOf.equals(Types.ARRAY)){
                 error($name,"Cannot reassign arrays");
             } else{
@@ -1258,6 +1265,7 @@ expr
       // $f2 = $b.value + "";
       $f2 = $b.left;
       $sign = $op.getText();
+      $isExpression = true;
       if($b.isDouble) {
         $typeOf = Types.DOUBLE;
       }
