@@ -258,12 +258,19 @@ grammar Simple;
   
 
   void generateDoubleAssign(String name, String value) {
+    String dName="DOUBLE_" + data_count;
+    data_count++;
     String s = ".data"
     +"\n\t" + name  + ": .double "+value
     +"\n\t.text";
     addCodeLine(s);
 
-
+    addCodeLine("la t0," + dName);
+    addCodeLine("fld  fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fsd fa0, (t0)");
+    addCodeLine("la t0, " + name);
+    addCodeLine("fld fa0, (t0)");
   }
 
 
@@ -325,10 +332,26 @@ grammar Simple;
     addCodeLine("sw t1, (t0)");
   }
 
-  String generateLoadId (String id) {
+  String generateLoadId (String id, String register) {
     String code = "";
     code += "la t0, " + id + "\n";
-    code += "    fld " + "ft0" + ",(t0)" + "\n";
+    code += "    fld " + register + ",(t0)" + "\n";
+    return code;
+  }
+  String addDoubleValue(double x) {
+    String label = "VAL"+data_count;
+    data_count++;
+    String s = ".data"
+    +"\n\t" + label  + ": .double "+x
+    +"\n\t.text";
+    addCodeLine(s);
+    return label;
+  }
+  String generateDoubleConstant(double value, String register) {
+    String code = "";
+    String label = addDoubleValue(value);
+    code += "    la " + "t0," + label + "\n"; 
+    code += "    fld " + register + ",(t0)" + "\n";
     return code;
   }
 
@@ -502,6 +525,7 @@ prog:
 
 assignment
 	locals[String value, String typeOf, boolean isError]:
+  {String register = "fa0";}
 	name = VARIABLE_NAME '=' (
 		t = DECIMAL {
       $typeOf = Types.DOUBLE;
@@ -511,7 +535,7 @@ assignment
       $typeOf = Types.INT;
 	    $value = $t.getText();
     }
-		| e = expr {
+		| e = expr[register] {
 	    if(isDebug) 
         System.out.println("expression: " + $e.exprString);
       // can check if contains a decimal but doesnt check types of variables
@@ -664,7 +688,7 @@ statement:
 	| assignment
 	| while_statement
 	| input
-	| expr
+	| expr["fa0"]
 	| if_else
 	| condition
 	| output
@@ -678,7 +702,7 @@ statement:
         addLoopCall();
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
-	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
+	| (at = 'return' y = varExprOrType | expr["fa0"]) { //will most likely need to edit this for recursion
     if(isScopeGlobal()) {
       error($at, "error attempting to call return outside a function");
       } {
@@ -768,21 +792,10 @@ get_from_array
       }
     }
 };
-square_root
-	returns[float value, String exprString, boolean hasKnownValue]:
-	'square root' c = VARIABLE_NAME {
-    Identifier var = getVariable($c.getText());
-    $exprString = "Math.sqrt(" + var.id + ")";
-    $hasKnownValue = false;
-  }
-	| 'square root' e = expr {
-      $value = $e.value;
-      $exprString = "Math.sqrt(" + String.valueOf($e.value) + ")";   
-      $hasKnownValue = $e.hasKnownValue;
-    };
-expr
+
+expr [String register]
 	returns[boolean hasKnownValue, float value, String exprString, String typeOf]:
-	a = word {
+	a = word[$register] {
       $exprString = $a.exprString;
       $typeOf = $a.isDouble ? Types.DOUBLE : Types.INT;
       if ($a.hasKnownValue) {
@@ -791,8 +804,9 @@ expr
       } else {
         $hasKnownValue = false;
       } 
+      String nextRegister = ($register.equals("ft0")) ? "ft1" : "ft0";
     } (
-		op = ('plus' | 'minus') b = word {
+		op = ('plus' | 'minus') b = word[nextRegister] {
       if($b.isDouble) {
         $typeOf = Types.DOUBLE;
       }
@@ -800,33 +814,34 @@ expr
 		      $exprString += $b.exprString;
           if ($hasKnownValue && $b.hasKnownValue)
             $value = $value + $b.value;
-          addCodeLine($exprString + "    fadd.d   ft0, ft0  ft1");
+          addCodeLine($exprString + "    fadd.d   " + $register + "," + $register + "," + nextRegister);
         } else {
 		        $exprString += $b.exprString;
           if ($hasKnownValue && $b.hasKnownValue)
             $value = $value - $b.value;
-          addCodeLine($exprString + "    fsub.d   ft0, ft0  ft1");
+          addCodeLine($exprString + "    fsub.d   " + $register + "," + $register + "," + nextRegister);
         }
     }
 	)*;
 
-word
+word[String register]
 	returns[boolean hasKnownValue, float value, String exprString, boolean isDouble]:
-	a = factor {
+	a = factor[$register] {
       $exprString = $a.factorString;
       $isDouble = $a.isDouble;
       if ($a.hasKnownValue) {
         $hasKnownValue = true;
         $value = $a.value;
-      } else $hasKnownValue = false;
+      } else {$hasKnownValue = false;}
+      String nextRegister = ($register.equals("ft0")) ? "ft1" : "ft0";
     } (
-		op = ('multiply' | 'divide' | 'mod') b = factor {
+		op = ('multiply' | 'divide' | 'mod') b = factor[nextRegister] {
         if($op.getText().equals("divide")) {
               $exprString += $b.factorString;
-              addCodeLine($exprString + "    fdiv.d   ft0, ft0  ft1");
+              addCodeLine($exprString + "    fdiv.d   " + $register + "," + $register + "," + nextRegister);
 	        } else if($op.getText().equals("multiply")) {
               $exprString += $b.factorString;
-              addCodeLine($exprString + "    fmul.d   ft0, ft0  ft1");
+              addCodeLine($exprString + "    fmul.d   " + $register + "," + $register + "," + nextRegister);
 	        } else if($op.getText().equals("mod")) {
               $exprString +=" % " + $b.factorString;
         } 
@@ -849,22 +864,24 @@ word
       }
 	)*;
 
-factor
+factor[String register]
 	returns[boolean hasKnownValue, float value, String factorString, boolean isDouble]:
 	INT {
       $hasKnownValue = true; 
       $value = Integer.parseInt($INT.getText()); 
-		  $factorString = ""+$INT.getText();
+		  //$factorString = ""+$INT.getText();
+      $factorString = generateDoubleConstant((double)$value, register);
     }
 	| DECIMAL {
 	  $isDouble = true;
     $hasKnownValue = true; 
     $value = Float.parseFloat($DECIMAL.getText());
-		$factorString = ""+$DECIMAL.getText();
+		//$factorString = ""+$DECIMAL.getText();
+    $factorString = generateDoubleConstant((double)$value, register);
     }
 	| VARIABLE_NAME {
         String id = $VARIABLE_NAME.getText();
-	      $factorString = generateLoadId(id);
+	      $factorString = generateLoadId(id, $register);
         used.add(id);
         // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
         if (!doesVariableExist(id)) {
@@ -883,15 +900,8 @@ factor
         }
         $hasKnownValue = false;
       }
-	| square_root {
-        $factorString = $square_root.exprString;
-        $isDouble = true;
-        $hasKnownValue = true;
-        if ( $square_root.hasKnownValue ) {
-          $value = $square_root.value;
-        }
-      }
-	| '(' expr ')' { 
+
+	| '(' expr[$register] ')' { 
 		    $factorString = '('+ $expr.exprString +')';
         $isDouble = $expr.typeOf.equals(Types.DOUBLE);
         if ($expr.hasKnownValue) {
@@ -1380,7 +1390,7 @@ printType
         }
         $hasKnownValue = false;
       }
-	| expr {
+	| expr["fa0"] {
           $hasKnownValue = true; 
           $value = String.valueOf($expr.value); 
 		};
@@ -1413,7 +1423,7 @@ varExprOrType
 	) {
     $asText=$t.getText();
   }
-	| e = expr {
+	| e = expr["fa0"] {
       $typeOf=$e.typeOf;
 	    $asText = $e.exprString;
   }

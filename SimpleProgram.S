@@ -5,29 +5,14 @@
 
 main:
 	.data
-	x: .word 3
+	z: .double 5.0
 	.text
-	.data
-	y: .word 3
-	.text
-	___CHECK______protected___loop____0:
-	la t0, x
-	lw t0, (t0)
-	la t1, y
-	lw t1, (t1)
-	bge t0, t1, ______protected___loop____0
-	call ____return_from______protected___loop____0
-	______protected___loop____0: 
-	.data
-	pstr0: .asciz "looping"
-	.text
-	la    a0, 	pstr0
-	li    a7, 4
-	ecall
-
-	call print_newline
-	call ___CHECK______protected___loop____0
-	____return_from______protected___loop____0:
+	la t0,DOUBLE_0
+	fld  fa0, (t0)
+	la t0, z
+	fsd fa0, (t0)
+	la t0, z
+	fld fa0, (t0)
 	jal end
 
 print_newline:
