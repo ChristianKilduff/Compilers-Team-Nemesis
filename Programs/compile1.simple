@@ -1,5 +1,3 @@
-list = [0.0]
+i = 0.0
 
-add 3.0 to list
-
-print list
+print i
