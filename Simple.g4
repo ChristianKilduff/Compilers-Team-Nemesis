@@ -455,19 +455,10 @@ grammar Simple;
   
 
   void generateDoubleAssign(String name, String value) {
-    String dName="DOUBLE_" + data_count;
-    data_count++;
     String s = ".data"
     +"\n\t" + name  + ": .double "+value
     +"\n\t.text";
     addCodeLine(s);
-
-    addCodeLine("la t0," + dName);
-    addCodeLine("fld  fa0, (t0)");
-    addCodeLine("la t0, " + name);
-    addCodeLine("fsd fa0, (t0)");
-    addCodeLine("la t0, " + name);
-    addCodeLine("fld fa0, (t0)");
   }
 
 

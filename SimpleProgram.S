@@ -9,9 +9,9 @@
 
 main:
 	.data
-	i: .double 0.0
+	x: .double 5.0
 	.text
-	la t0, i
+	la t0, x
 	fld fa0, (t0)
 	li a7, 3
 	ecall
