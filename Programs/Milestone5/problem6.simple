@@ -17,13 +17,7 @@ define list_double read_array(int r_n) {
 }
 
 define print_array(list_double p_list, int p_n) {
-    i_p = 1
-    v = 0.0
-    repeat p_n {
-        assign v index i_p from p_list
-        print v
-        i_p = i_p plus 1
-    }
+    print p_list
 }
 
 list = [1.0, 2.0, 3.0, 4.0]
