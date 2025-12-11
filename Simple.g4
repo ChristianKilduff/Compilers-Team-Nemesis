@@ -699,6 +699,12 @@ grammar Simple;
     Map<String,String> rightMap = genConditionalCodeHelper(right, rightType, 1);
 
     String code = rightMap.get("conditional_code");
+    if(risc_word.equals("ne")) {
+      if(rightType.equals(Types.DOUBLE))
+	      code = rightMap.get("ne_conditional_code");
+      else if(leftType.equals(Types.DOUBLE))
+        code = leftMap.get("ne_conditional_code");
+    }
     code = code.replace("<risc>", risc_word);
     code = code.replace("<branch>", ifBlock);
     code = code.replace("<left_register>", leftMap.get("register"));
@@ -711,7 +717,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
   Map<String,String> outmap = new HashMap();
   String addressRegister = "t" + i;
   String valueRegister = addressRegister;
-  System.out.println(type);
+  // System.out.println(type);
   if(type.equals(Types.VARIABLE)) {
     Identifier var = getVariable(a);
       addCodeLine("la "+ addressRegister+ ", " + a);
@@ -733,6 +739,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
 	  addCodeLine("fld " + valueRegister + ", (t0)");
 
     outmap.put("conditional_code", "f<risc>.d t2, fa0, fa1" + "\n\tbnez t2, <branch>");
+    outmap.put("ne_conditional_code", "feq.d t2, fa0, fa1" + "\n\tbeq t2, zero, <branch>");
 
   } else if(type.equals(Types.INT)) {
     outmap.put("conditional_code", "b<risc> <left_register>, <right_register>, <branch>");
@@ -861,7 +868,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
 
 
 
-  void arithmeticDouble(String var, String f1, String f2, String sign) {
+  void arithmeticDouble(String var, String f1, String f2, boolean isF1Var, boolean isF2Var, String sign) {
     String op = "";
     switch(sign) {
       case "multiply":
@@ -881,17 +888,51 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
         break;
     }
 
+    if(!isF1Var) {
+      String tmpd = "tmp_double______" + data_count++;
+      generateDoubleAssign(tmpd, f1);
+      addCodeLine("la t1, " + tmpd);
+      addCodeLine("fld fa0, 0(t0)");
+    } else { // left is var
+      Identifier id = getVariable(f1);
+      addCodeLine("la t0, " + f1);
+      if(id.type.equals(Types.INT)) {
+        addCodeLine("lw a0, 0(t0)");
+        addCodeLine("fcvt.d.w fa0, a0");
+      } else {
+        addCodeLine("fld fa0, 0(t0)");
+      }
+    }
+
+    if(!isF2Var) {
+      String tmpd = "tmp_double______" + data_count++;
+      generateDoubleAssign(tmpd, f2);
+      addCodeLine("la t1, " + tmpd);
+      addCodeLine("fld fa1, 0(t1)");
+    } else { // right is var
+      Identifier id = getVariable(f2);
+      addCodeLine("la t1, " + f2);
+      if(id.type.equals(Types.INT)) {
+        addCodeLine("lw a0, 0(t1)");
+        addCodeLine("fcvt.d.w fa1, a0");
+      } else {
+        addCodeLine("fld fa1, 0(t1)");
+      }
+    }
+
     addCodeLine("la t2, " + var);
-    addCodeLine("la t0, " + f1);
-    addCodeLine("la t1, " + f2);
 
-    addCodeLine("fld fa0, 0(t0)");
-    addCodeLine("fld fa1, 0(t1)");
+    
 
+  
     addCodeLine(op + " fa2, fa0, fa1");
     addCodeLine("fsd fa2, (t2)");
   }
-  void arithmeticInt(String var, String f1, String f2, String sign) {
+  void arithmeticInt(String var, String f1, String f2, boolean isF1Var, boolean isF2Var, String sign) {
+    if(getVariable(var) != null && getVariable(var).type.equals(Types.DOUBLE)) {
+      arithmeticDouble(var,f1,f2,isF1Var,isF2Var,sign);
+      return;
+    }
     String op = "";
     switch(sign) {
       case "multiply":
@@ -910,12 +951,22 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
         op = "rem";
         break;
     }
-    addCodeLine("la t2, " + var);
-    addCodeLine("la t0, " + f1);
-    addCodeLine("la t1, " + f2);
+	
+    if(isF1Var) {
+      addCodeLine("la t0, " + f1);
+      addCodeLine("lw t0, 0(t0)");
+    } else {
+      addCodeLine("li t0, " + f1);
+    }
 
-    addCodeLine("lw t0, 0(t0)");
-    addCodeLine("lw t1, 0(t1)");
+    if(isF2Var) {
+      addCodeLine("la t1, " + f2);
+      addCodeLine("lw t1, 0(t1)");
+    } else {
+      addCodeLine("li t1, " + f2);
+    }
+    addCodeLine("la t2, " + var);
+
 
     addCodeLine(op + " t3, t0, t1");
     addCodeLine("sw t3, (t2)");
@@ -978,11 +1029,8 @@ assignment
       }
     }
 		| e = expr {
-	    if(isDebug) 
-        System.out.println("expression: " + $e.exprString);
-      // can check if contains a decimal but doesnt check types of variables
       $typeOf = $e.typeOf;
-      $isExpr = $e.isExpression;
+      $isExpr = true;
     }
 	) {
     if(!$isError) {
@@ -1004,34 +1052,37 @@ assignment
       if(doAssign){
           if(newID == null) { // if not already exists create new var
                 String assignmentString = "";
+
                 if($isVar) {
                   String v = "";
                   if($typeOf.equals(Types.DOUBLE)) v = "0.0";
                   else if($typeOf.equals(Types.INT)) v = "0";
                   generateAssignOrReassign($name.getText(), v, $typeOf);
                   assignVarToVar($name.getText(), $v.getText(), $typeOf);
+                  createVariable($name.getText(), $value, $typeOf);
                 } else if($isExpr) {
                   generateAssignOrReassign($name.getText(), "0", $typeOf);
 
                   if($typeOf.equals(Types.DOUBLE))
-                    arithmeticDouble($name.getText(), $e.f1, $e.f2, $e.sign);
+                    arithmeticDouble($name.getText(), $e.f1, $e.f2, $e.isLeftVar, $e.isRightVar, $e.sign);
                   else
-                    arithmeticInt($name.getText(), $e.f1, $e.f2, $e.sign);
-                  
+                    arithmeticInt($name.getText(), $e.f1, $e.f2, $e.isLeftVar, $e.isRightVar, $e.sign);
+                  createVariable($name.getText(), $value, $typeOf);
                 }else if($typeOf.equals(Types.ARRAY)) {
                     generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
+                    createVariable($name.getText(), $value, $typeOf);
                 } else {
                   generateAssignOrReassign($name.getText(), $value, $typeOf);
+                  createVariable($name.getText(), $value, $typeOf);
                 }
-                newID = createVariable($name.getText(), $value, $typeOf);
           } else { // if already exists then reassign
 		          if($isExpr) {
-                System.out.println("test");
+                // System.out.println("test");
 		                
                   if($typeOf.equals(Types.DOUBLE))
-                    arithmeticDouble($name.getText(), $e.f1, $e.f2, $e.sign);
+                    arithmeticDouble($name.getText(), $e.f1, $e.f2, $e.isLeftVar, $e.isRightVar, $e.sign);
                   else
-                    arithmeticInt($name.getText(), $e.f1, $e.f2, $e.sign);
+                    arithmeticInt($name.getText(), $e.f1, $e.f2, $e.isLeftVar, $e.isRightVar, $e.sign);
                   
               }
             else if($isVar) {
@@ -1096,6 +1147,7 @@ array
 
 statement:
 	append_to_array
+	| assignment
 	| remove_from_array
 	| clear_array
 	| get_from_array
@@ -1103,10 +1155,8 @@ statement:
 	| array_length
 	| functionCall
 	| for_statement
-	| assignment
 	| while_statement
 	| input
-	| expr
 	| if_else
 	| condition
 	| output
@@ -1156,19 +1206,18 @@ append_to_array:
     if(arr == null) {
       error($n, "Error array does not exist");
     } else {
-    if($v.typeOf.equals(Types.VARIABLE)) {
-
-      Identifier var = getVariable($v.asText);
-      if(!var.type.equals(arr.type)) {
-        error($n, "var type does not match array type");
-      } else {
-        arr.add($v.asText, true);
-      }
-      } else if(!$v.typeOf.equals(arr.type) || $v.isExpression) {
-        error($n, "type of array does not match input");
-      } else {
-        arr.add($v.asText, false);
-      }
+      if($v.typeOf.equals(Types.VARIABLE)) {
+        Identifier var = getVariable($v.asText);
+        if(!var.type.equals(arr.type)) {
+          error($n, "var type does not match array type");
+        } else {
+          arr.add($v.asText, true);
+        }
+        } else if(!$v.typeOf.equals(arr.type) || $v.isExpression) {
+          error($n, "type of array does not match input");
+        } else {
+          arr.add($v.asText, false);
+        }
     }
 };
 
@@ -1275,150 +1324,67 @@ square_root
     $hasKnownValue = false;
   }
 	| 'square root' e = expr {
-      $value = $e.value;
-      $exprString = "Math.sqrt(" + String.valueOf($e.value) + ")";   
-      $hasKnownValue = $e.hasKnownValue;
+      // $value = $e.value;
+      // $exprString = "Math.sqrt(" + String.valueOf($e.value) + ")";   
+      // $hasKnownValue = $e.hasKnownValue;
     };
-expr
-	returns[boolean hasKnownValue, float value, String exprString, String typeOf, boolean isExpression, String f1, String sign, String f2]
-		:
-	a = word {
-      $f1 = $a.left;
-      $sign = $a.sign;
-      $f2 = $a.right;
 
-	    $isExpression = $a.isExpression;
-      $exprString = $a.exprString;
-      $typeOf = $a.isDouble ? Types.DOUBLE : Types.INT;
-      if ($a.hasKnownValue) {
-        $hasKnownValue = true;
-        $value = $a.value;
-      } else {
-        $hasKnownValue = false;
-      } 
-    } (
-		op = ('plus' | 'minus') b = word {
-      // $f2 = $b.value + "";
-      $f2 = $b.left;
-      $sign = $op.getText();
-      $isExpression = true;
-      if($b.isDouble) {
+expr
+	returns[float value, boolean hasKnownValue, double value, String typeOf, String f1, String sign, String f2, boolean isLeftVar, boolean isRightVar]
+	locals[double val1, double val2]:
+	(
+		a = VARIABLE_NAME {
+      $isLeftVar = true;
+      $hasKnownValue = false;
+	
+      Identifier id = getVariable($a.getText());
+      if(id == null) {
+        error($a, "Variable does not exist");
+      } else if(id.type.equals(Types.DOUBLE)) {
         $typeOf = Types.DOUBLE;
       }
-        if ($op.getText().equals("plus")) {
-		      $exprString += $b.exprString;
-          if ($hasKnownValue && $b.hasKnownValue)
-            $value = $value + $b.value;
-          // addCodeLine($exprString + "    fadd.d   ft0, ft0  ft1");
-        } else {
-		        $exprString += $b.exprString;
-          if ($hasKnownValue && $b.hasKnownValue)
-            $value = $value - $b.value;
-          // addCodeLine($exprString + "    fsub.d   ft0, ft0  ft1");
-        }
-	  $isExpression = true;
     }
-	)*;
+		| (
+			a = INT {$val1 = Integer.parseInt($a.getText());}
+			| a = DECIMAL {$val1 = Double.parseDouble($a.getText()); $typeOf = Types.DOUBLE;}
+		)
+	) {
+      $f1 = $a.getText();
 
-word
-	returns[boolean hasKnownValue, float value, String exprString, boolean isDouble, boolean isExpression, String left, String right, String sign]
-		:
-	a = factor {
-      $left = $a.factorString;
-      $exprString = $a.factorString;
-      $isDouble = $a.isDouble;
-      if ($a.hasKnownValue) {
-        $hasKnownValue = true;
-        $value = $a.value;
-      } else $hasKnownValue = false;
-    } (
-		op = ('multiply' | 'divide' | 'mod') b = factor {
-	      $sign = $op.getText();
-        $right = $b.factorString;
-        
-        if($op.getText().equals("divide")) {
-              $exprString += $b.factorString;
-              // addCodeLine($exprString + "    fdiv.d   ft0, ft0  ft1");
-	        } else if($op.getText().equals("multiply")) {
-              $exprString += $b.factorString;
-              // addCodeLine($exprString + "    fmul.d   ft0, ft0  ft1");
-	        } else if($op.getText().equals("mod")) {
-              $exprString +=" % " + $b.factorString;
-        } 
-        if($b.isDouble) {          
-	          $isDouble = true;
-        }
-
-
-        if ($b.hasKnownValue && $op.getText().equals("divide") && $b.value == 0) {
+  } (
+		op = ('plus' | 'minus' | 'multiply' | 'divide' | 'mod') {$sign = $op.getText();} (
+			b = VARIABLE_NAME {
+          
+          $isRightVar = true;
           $hasKnownValue = false;
-        } else if ($hasKnownValue && $b.hasKnownValue) {
-          if ($op.getText().equals("multiply")) {
-            // $value = $value * $b.value;
-          } else if ($op.getText().equals("divide")){
-            // $value = $value / $b.value;
-          }
-        } else {
-          $hasKnownValue = false;
+          
+          Identifier id = getVariable($b.getText());
+          if(id == null) {
+            error($b, "Variable does not exist");
+          } else if(id.type.equals(Types.DOUBLE)) {
+            $typeOf = Types.DOUBLE;
         }
-
-	        $isExpression = true;
-      }
-	)*;
-
-factor
-	returns[boolean hasKnownValue, float value, String factorString, boolean isDouble]:
-	INT {
-      $hasKnownValue = true; 
-      $value = Integer.parseInt($INT.getText()); 
-		  $factorString = ""+$INT.getText();
     }
-	| DECIMAL {
-	  $isDouble = true;
-    $hasKnownValue = true; 
-    $value = Float.parseFloat($DECIMAL.getText());
-		$factorString = ""+$DECIMAL.getText();
-    }
-	| VARIABLE_NAME {
-		      $factorString = $VARIABLE_NAME.getText();
-        String id = $VARIABLE_NAME.getText();
-	      // $factorString = generateLoadId(id);
-        used.add(id);
-        // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
-        if (!doesVariableExist(id)) {
-          // General use-before-assign.
-
-          // error($VARIABLE_NAME, "use of variable '" + id + "' before assignment");
-        } else {
-          String t = getVariable(id).type;
-          if(t.equals(Types.DOUBLE)) {
-            $isDouble = true;
-	          } else if(!t.equals(Types.INT)) {
-              if (getScope().equals("Global")) {  
-	              error($VARIABLE_NAME, id + " is not an int or double");
-              }
-          }
-        }
-        $hasKnownValue = false;
-      }
-	| square_root {
-        $factorString = $square_root.exprString;
-        $isDouble = true;
-        $hasKnownValue = true;
-        if ( $square_root.hasKnownValue ) {
-          $value = $square_root.value;
-        }
-      }
-	| '(' expr ')' { 
-		    $factorString = '('+ $expr.exprString +')';
-        $isDouble = $expr.typeOf.equals(Types.DOUBLE);
-        if ($expr.hasKnownValue) {
-          $hasKnownValue = true;
-          $value = $expr.value;
-        } else {
-          $hasKnownValue = false;
-        }
-	      };
+			| (
+				b = INT {$val2 = Integer.parseInt($b.getText());}
+				| b = DECIMAL {double val2 = Double.parseDouble($b.getText()); $typeOf = Types.DOUBLE;
+						}
+			)
+		) {
+      $f2 = $b.getText();
+      if($sign.equals("plus"))
+        $value = $val1 + $val2;
+      else if($sign.equals("minus"))
+        $value = $val1 - $val2;
+      else if($sign.equals("multiply"))
+        $value = $val1 * $val2;
+      else
+        $value = $val1 / $val2;
+    
+      if($typeOf == null)
+	       $typeOf = Types.INT;
+  }
+	);
 
 conditional_statement
 	returns[String conditionSign, boolean isNot]: (
@@ -1468,9 +1434,9 @@ condition
       
       case "==":
         if($isNot) {
-          $risc_word = "eq";
-        } else {
           $risc_word = "ne";
+        } else {
+          $risc_word = "eq";
         }
         break;
 
@@ -1484,7 +1450,7 @@ condition
       
     }
 
-    System.out.println($condition_sign + " " +$risc_word);
+    // System.out.println($condition_sign + " " +$risc_word);
 } (
 		y = INT {$rightType = Types.INT;}
 		| y = DECIMAL {$rightType = Types.DOUBLE;}
@@ -1858,11 +1824,7 @@ printType
           printVar(id.id, id.type);
         }
         $hasKnownValue = false;
-      }
-	| expr {
-          $hasKnownValue = true; 
-          $value = String.valueOf($expr.value); 
-		};
+      };
 
 output
 	locals[boolean inline]:
@@ -1889,11 +1851,11 @@ varExprOrType
   }
 	| e = expr {
       $typeOf=$e.typeOf;
-      $isExpression = $e.isExpression;
-	    $asText = $e.exprString;
+      $isExpression = true;
+      $asText = "";
   }
 	| f = functionCall {
-	      $typeOf=Types.FUNCTION_CALL;
+      $typeOf=Types.FUNCTION_CALL;
       $asText = $f.value;
   };
 type: INT | STRING | DECIMAL | BOOL;

@@ -15,10 +15,7 @@ is income less than 10000.0{
 } if not{
     rate = 30
 }
-
-
-div = 100.0
-tax = rate divide div 
+tax = rate divide 100
 tax = tax multiply income
 net = income minus tax
 

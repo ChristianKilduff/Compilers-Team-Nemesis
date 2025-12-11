@@ -1,29 +1,27 @@
-n = 0.0
+n = 0
 
-input decimal n
+input number n
 
-steps = 0.0
+steps = 0
 max_val = n
 
-one = 1.0
-two = 2.0
-three = 3.0
-while n not equal to one {
-    is n greater than max_val{
+
+while n not equal to 1 {
+    is n greater than max_val {
         max_val = n
     }
 
-    m =0.0
-    * m = n mod two TODO
-    is m equal to 0.0 {
-        n = n divide two
-    } if not{
-        n = three multiply n
-        n = n plus one 
+    m = n mod 2
+    is m equal to 0 {
+        n = n divide 2
+    } if not {
+        n = 3 multiply n
+        n = n plus 1 
     }
 
-    steps = steps plus one 
+    steps = steps plus 1 
 }
+
 
 is n greater than max_val{
     max_val = n
