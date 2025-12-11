@@ -35,6 +35,7 @@ grammar Simple;
     ArrayList<String> paramNames;
     boolean doesReturn;
     String returnType;
+    String arrayTypeOrNull;
     String block_name;
     ArrayList<String> code = new ArrayList<String>();
 
@@ -44,6 +45,10 @@ grammar Simple;
 
     String getParamRef(int index) {
       return "____PARAM____" + name + "_____" + index;
+    }
+
+    String getReturnRef() {
+      return "____RETURN____" + name + "____";
     }
 
     void assignOrReassign(int index, String value) {
@@ -62,23 +67,16 @@ grammar Simple;
 
   int strIteration = 0;
   void addPrintLine(String line) {
-    String ref = "\tpstr" + strIteration;
-	      strIteration++;
+	    String ref = createGlobalString(line);
 
-	    String assignStr = ".data\n"
-      + ref+": .asciz \""
-        + line
-        + "\"\n\t"
-        + ".text";
-
-		  String printStr = "\tla    a0, "+ref
+		  String printStr = "lw a0, " + ref
 	      + "\n\tli    a7, 4"
-        +"\n\tecall";
-	      addCodeLine(assignStr + "\n" + printStr + "\n");
+        + "\n\tecall";
+	      addCodeLine(printStr + "\n");
   }
 
   void addPrintNewLine() {
-		      addCodeLine("jal ra, print_newline");
+		    addCodeLine("jal ra, print_newline");
   }
 
   
@@ -103,6 +101,8 @@ grammar Simple;
     for(int i = 0; i < arity; i++) {
       globalVariables.add(createGlobalScopeVariable(fid.getParamRef(i), "0", paramTypes.get(i)));
     }
+    if(doesReturn)
+      globalVariables.add(createGlobalScopeVariable(fid.getReturnRef(), "0", returnType));
 
     fid.block_name = "____FUNCTION___" + name;
     functionTable.put(name, fid);
@@ -253,8 +253,13 @@ grammar Simple;
   Map<String, RiscArray> ARRAYS = new HashMap();
 
   RiscArray generateArray(String name, String type, String ... values) {
-      RiscArray arr  = new RiscArray(name, type);
-      ARRAYS.put(name, arr);
+      RiscArray arr  = ARRAYS.get(name);
+      if( arr == null) {
+        arr = new RiscArray(name, type);
+        ARRAYS.put(name, arr);
+      } else {
+        arr.clear();
+      }
       for(String v : values) {
         arr.add(v, false);
       }
@@ -269,19 +274,50 @@ grammar Simple;
     int i = 0;
     String type;
     String sizeVarName;
+    int size = 800;
 
     public RiscArray(String name, String type) {
       this.name = name;
       this.type = type;
-	      i=array_count++;
-        sizeVarName = "count_arr_"+i;
-        
-        int size = 400;
-        if(type.equals(Types.DOUBLE)) size *=2;
-	      addCodeLine(".data"
-          + "\n\t" + name + ": .space 400"
-          + "\n\t" + sizeVarName +":   .word 0"
-          + "\n\t.text\n");
+      i=array_count++;
+      sizeVarName = "count_arr_"+i;
+      
+      if(type.equals(Types.DOUBLE)) size *=2;
+      addCodeLine(".data"
+        + "\n\t" + name + ": .space 400"
+        + "\n\t" + sizeVarName +":   .word 0"
+        + "\n\t.text\n");
+    }
+
+    void cloneFrom(RiscArray arr) {
+      name = arr.name;
+      c = arr.c;
+      i = arr.i;
+      sizeVarName = arr.sizeVarName;
+    }
+
+    void assignVarIndex(String var, String index, boolean isIndexVar) {
+      addCodeLine("la t0, " + var); // t0=var address
+      if(isIndexVar) {
+        addCodeLine("lw t1, " + index);
+      } else {
+        addCodeLine("li t1, " + index);
+      }
+      addCodeLine("addi t1, t1, -1");
+
+      i = type.equals(Types.DOUBLE) ? 3 : 2;
+      String code = "\n\tla t2, " + name  // t2 = array address
+      + "\n\tslli t3, t1, " + i // t3 = pos of index
+      + "\n\tadd t3, t2, t3"; //t3 = address of arr[i]
+
+      addCodeLine(code);
+      if(type.equals(Types.DOUBLE)) {
+        addCodeLine("fld fa0, (t3)");
+        addCodeLine("fsd fa0, (t0)");
+      } else {
+        addCodeLine("lw a0, (t3)");
+        addCodeLine("sw a0, (t0)");
+      }
     }
 
 
@@ -374,8 +410,8 @@ grammar Simple;
     // all ai
     void print() {
 	      int c = data_count++;
-        String loop_name = "loop_" + c;
-        String done_name = "done_" + c;
+        String loop_name = "____print_arr_____loop_" + c;
+        String done_name = "____print_arr_____done_" + c;
         String code = 
             "\n\tla t0, " + name + "\n\t" // arr address (t0)
             + "lw t1, " + sizeVarName  + "\n\t" // size of array (t1)
@@ -401,8 +437,7 @@ grammar Simple;
                 "li a7, 1\n\t" +   // RARS syscall 1 = print integer
                 "ecall\n\t";
         }
-        code += "\n\tla t5, space"  
-              + "\n\tlw a0, (t5)"
+        code += "\n\tlw a0, space"
               + "\n\tli a7, 4"     
               + "\n\tecall\n\t";
         // Increment index and loop
@@ -548,29 +583,28 @@ grammar Simple;
 
 
   void generateStringAssign(String name, String value) {
-    String tmpN = name + "_tmp____protected";
-    String s = ".data" 
-      + "\n\t" + tmpN + ": .asciz " + "\"" + value + "\""
-      + "\n\t" + name + ": .word " + tmpN
-	    +"\n\t.text";
+    String s = "\n\t" + name + ": .word " + createGlobalString(value);
     addCodeLine(s);
   }
 
   void reassignString(String name, String value) {
-    data_count++;
-    String tmpName = "tmpStr_" + data_count;
-    String s = ".data" 
-	    +"\n\t" + tmpName +": .asciz " + value +""
-	    +"\n\t.text";
-
-    addCodeLine(s);
-    data_count++;
-
-	
-
     addCodeLine("la t0," + name);
-    addCodeLine("la t1, " + tmpName);
+    addCodeLine("la t1, " + createGlobalString(value));
     addCodeLine("sw t1, (t0)");
+  }
+
+  String createGlobalString(String value) {
+    return createGlobalString("____tmp_str_____" + data_count++, value);
+  }
+  String createGlobalString(String name, String value) {
+    Identifier id = new Identifier();
+    id.id = name;
+    id.value = value;
+    id.scope = "Global";
+    id.type = Types.STRING;
+    globalVariables.add(id);
+
+    return id.id;
   }
 
   String generateLoadId (String id) {
@@ -588,24 +622,27 @@ grammar Simple;
     + "\n.globl end"
     + "\n.globl print_newline\n\n");
     emit("main:\n");
+    createGlobalString("space", " ");
+    emit("\t.data\n");
+    for(Identifier var : globalVariables) {
+      // generateInitialAssign(var.id, "0", var.type);
+      if(var.type.equals(Types.STRING)) {
+        String tmp = "\t____" + var.id;
+        emit(tmp + ": .asciz \"" + var.value + "\"\n\t");
+        emit(var.id +": .word " + tmp + "\n\t");
+      } else if(var.type.equals(Types.INT)) {
+        emit(var.id +": .word " + var.value + "\n\t");
+      }
+      else if(var.type.equals(Types.DOUBLE)) {
+        emit(var.id +": .double " + var.value + "\n\t");
+      }
+    }
+
+    emit(".text\n\n");
   }
 
   void writeFile() {
     try (PrintWriter pw = new PrintWriter("SimpleProgram.S", "UTF-8")) {
-      setScope("globalVars");
-      generateInitialAssign("space", " ", Types.STRING);
-      for(Identifier var : globalVariables) {
-        generateInitialAssign(var.id, "0", var.type);
-      }
-      exitMainScope();
-
-      ArrayList<String> vars = codeBlockLines.get("globalVars");
-      if(vars != null)
-        for(String line : vars) 
-              pw.print("\t"+line + "\n");
-
-      codeBlockLines.remove("globalVars");
-
 
       for(int i=0; i<functionList.size(); i++) {
         FunctionIdentifier fid = functionList.get(i);
@@ -761,6 +798,10 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
     addCodeLine("jal ra, " + name);
   }
 
+  void j(String name) {
+    addCodeLine("j " + name);
+  }
+
 
   void printVar(String name, String type) {
 
@@ -823,10 +864,15 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
       + "\n\tfld fa0 (t0)" 
       + "\n\tla t2, " + toAssign 
       + "\n\tfsd fa0 (t2)";
+    } else if(type.equals(Types.ARRAY) && ARRAYS.get(assignFrom) != null) {
+      RiscArray arr1 = ARRAYS.get(toAssign);
+      arr1.cloneFrom(ARRAYS.get(assignFrom));
     }
 
     addCodeLine(code);
   }
+
+  
 
   String upRa() {
 	    return "\n\taddi sp, sp, -8"
@@ -975,7 +1021,6 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
 
 prog:
 	{
-    openProgram();
     // True : print debug messages like variable assigning and function creation/calls
     // False : Don't. Just prints the errors and whether it compiled successfully or not
     isDebug = false;
@@ -984,6 +1029,7 @@ prog:
        if(numErrors == 0) {
         if(isDebug) System.out.println("\n––");
         System.out.println("Compile Successful");
+        openProgram();
         writeFile();
        } else {
         System.err.println("There are errors in the program, cannot compile");
@@ -1088,7 +1134,7 @@ assignment
             else if($isVar) {
                 assignVarToVar(newID.id, $v.getText(), $typeOf);
             } else if($typeOf.equals(Types.ARRAY)){
-                error($name,"Cannot reassign arrays");
+                generateArray($name.getText(), $a.typeOf, $a.values.toArray(new String[0]));
             } else{
                 generateReassign($name.getText(), $value, $typeOf);
             }
@@ -1162,7 +1208,7 @@ statement:
 	| output
 	| 'break' {
       if(!loopReturnBlocks.empty())
-          call(getCurrLoopReturn());
+          j(getCurrLoopReturn());
       
   }
 	| 'continue' {
@@ -1170,20 +1216,39 @@ statement:
         addLoopCall();
   }
 	// needed to move because returns need to be allowed in loops and ifs within functions
-	| (at = 'return' y = varExprOrType | expr) { //will most likely need to edit this for recursion
+	| return_block;
+
+return_block
+	locals[String typeOf]: (
+		at = 'return' (
+			v = INT {$typeOf = Types.INT;}
+			| v = DECIMAL {$typeOf = Types.DOUBLE;}
+			| v = STRING {$typeOf = Types.STRING;}
+			| v = VARIABLE_NAME {$typeOf = Types.VARIABLE;}
+		)
+	) {
     if(isScopeGlobal()) {
       error($at, "error attempting to call return outside a function");
       } {
-        String b = $y.asText;
         if(isFunctionReturning == 1) {
-          // addCodeLine("return " + $y.asText + ";");
-          System.out.println("Return values not implemented");
+          FunctionIdentifier fid = getFunction(getScope());
+          if($typeOf.equals(Types.VARIABLE)) {
+            Identifier id = getVariable($v.getText());
+            
+
+            if(fid.arrayTypeOrNull != null)
+              generateArray(fid.getReturnRef(), fid.arrayTypeOrNull, new String[] {});
+            assignVarToVar(fid.getReturnRef(), $v.getText(), fid.returnType);
+          } else {
+            generateAssignOrReassign(fid.getReturnRef(), $v.getText(), fid.returnType);
+          }
+          addReturnVoidCall();
         } else {
           error($at, "Error: function does not return a value");
         }
         }
   }
-	| (at = 'return') { //will most likely need to edit this for recursion
+	| (at = 'return') { 
     if(isScopeGlobal()) {
       error($at, "error attempting to call return outside a function");
       } {
@@ -1214,7 +1279,7 @@ append_to_array:
           arr.add($v.asText, true);
         }
         } else if(!$v.typeOf.equals(arr.type) || $v.isExpression) {
-          error($n, "type of array does not match input");
+          error($n, "type of array does not match input | arr type: " + arr.type);
         } else {
           arr.add($v.asText, false);
         }
@@ -1275,21 +1340,11 @@ remove_from_array
 };
 
 get_from_array
-	locals[int index]:
+	locals[boolean isIndexVar]:
 	'assign ' v = VARIABLE_NAME ' index ' (
-		i = INT {
-	        $index = (Integer.parseInt($i.getText()) - 1);
-	  }
-		| i_v = VARIABLE_NAME {
-      // TODO get index from a variable
-      Identifier id = getVariable($i_v.getText());
-      if(id == null) {
-        error($i_v, "variable does not exist");
-      } if(!id.type.equals(Types.INT)) {
-        error($i_v, "variable is not an int");
-      } else {
-        $index = Integer.parseInt(id.value)-1;
-      }
+		i = INT
+		| i = VARIABLE_NAME {
+      $isIndexVar = true;
     }
 	) ' from ' n = VARIABLE_NAME {
   RiscArray arr = ARRAYS.get($n.getText());
@@ -1299,20 +1354,9 @@ get_from_array
     } else {
       String arrType = arr.type;
       if(newID != null && !arrType.equals(newID.type)) {
-        error($n, "type of array does not match type of variable");
+	        error($n, "type of array does not match type of variable | arr type: " + arr.type);
       } else {
-        if(newID == null) {
-            newID = createVariable($v.getText(), "", arrType);
-            if(arrType.equals(Types.DOUBLE)) {
-              generateDoubleAssign(newID.id, "0.0");
-            } else if(arrType.equals(Types.INT)) {
-              generateIntAssign(newID.id, "0");
-            } else if(arrType.equals(Types.STRING)) {
-              generateStringAssign(newID.id, "");
-            }
-        } 
-        // TODO
-          // assignVarToVar(newID.id, arr.variables.get($index), arrType);
+        arr.assignVarIndex($v.getText(), $i.getText(), $isIndexVar);
       }
     }
 };
@@ -1512,12 +1556,12 @@ if_else
 
 
         genConditionalCode($i.a, $i.b, $i.leftType, $i.rightType, $i.risc_word, $ifBlock);
-        addCodeLine("call " + $elseBlock);
+        addCodeLine("j " + $elseBlock);
         addCodeLine($ifBlock + ": ");
       }
 
   } is = if_scope {
-    addCodeLine("call " + $afterBlock);
+    addCodeLine("j " + $afterBlock);
     addCodeLine($elseBlock + ": ");
 
   } (else_statement ifel = if_else)* (
@@ -1576,14 +1620,14 @@ while_statement
     addCodeLine($check_block+":");
 
     genConditionalCode($c.a, $c.b, $c.leftType, $c.rightType, $c.risc_word, $loop_block_name);
-    call($return_to_block);
+    j($return_to_block);
     addCodeLine($loop_block_name + ": ");
 
     
 
   } loopScope {
       // addLoopCall();
-      call($check_block);
+      j($check_block);
       addCodeLine($return_to_block + ":");
       finishLoop();
   };
@@ -1597,17 +1641,24 @@ loopScope:
 
 functionDefinition
 	returns[String name, int arity, boolean doesReturn, String returnType, String value]
-	locals[ArrayList<String> variableParamNames, ArrayList<String> varTypeAndName, String varType, String s, ArrayList<String> paramTypes, ArrayList<String> paramTypes]
+	locals[ArrayList<String> variableParamNames, ArrayList<String> varTypeAndName, String varType, String s, ArrayList<String> paramTypes, ArrayList<String> paramTypes, String arrayTypeOrNull]
 		:
 	'define' {$returnType = "void";} (
 		r = VARIABLE_NAME {
-    $returnType = $r.getText();
-    if($returnType.startsWith("list")) {
+      $doesReturn = true;
+      $returnType = $r.getText();
+      if($returnType.startsWith("list")) {
         String arrayType = $returnType.split("_")[1].toLowerCase();
           $returnType = Types.ARRAY;
-          if(arrayType.equals("int")) {}
-          else if(arrayType.equals("double")) {} 
-          if(arrayType.equals("string")) {}
+          if(arrayType.equals("int")) {
+	            $arrayTypeOrNull = Types.INT;
+          }
+          else if(arrayType.equals("double")) {
+	            $arrayTypeOrNull = Types.DOUBLE;
+          } 
+          if(arrayType.equals("string")) {
+	            $arrayTypeOrNull = Types.STRING;
+          }
 
         } else if($returnType.equals("int")) {
 	        $returnType = Types.INT;
@@ -1626,7 +1677,7 @@ functionDefinition
 		VARIABLE_NAME {
       $varType = $VARIABLE_NAME.getText();
         if ($varType.startsWith("list")){
-          $varType = Types.ARRAY;
+          // $varType = Types.ARRAY;
         }else if($varType.equals("int")) {
           $varType = Types.INT;
         }else if($varType.equals("double")) {
@@ -1660,24 +1711,19 @@ functionDefinition
       error($n, "Error: function " + $name + "already Exists");
     } else {
       $arity = $variableParamNames.size();
-		      FunctionIdentifier fid = createFunction($name, $arity, $doesReturn, $returnType, $paramTypes, $variableParamNames);
+      FunctionIdentifier fid = createFunction($name, $arity, $doesReturn, $returnType, $paramTypes, $variableParamNames);
+      fid.arrayTypeOrNull = $arrayTypeOrNull;
       setScope(fid.name);
 
       for(int i = 0; i < $variableParamNames.size(); i++) {
         String varName = $variableParamNames.get(i);
         String type = $paramTypes.get(i);
         generateAssignOrReassign(varName, "0", type);
-          if (type.startsWith("ArrayList") || type.startsWith("list")) {
-              String arrayType = "";
-              if(type.startsWith("list")) {
-                arrayType = type.split("_")[1];
-              } else {
-                arrayType = type.substring(type.indexOf('<') + 1, type.indexOf('>'));
-              }
-            arrayType = arrayType.toLowerCase();
-            Identifier A_ID = createVariable(varName, "<FUNCTION_PARAM>", Types.ARRAY);
+          if (type.startsWith("list")) {
+	            String arrayType = type.split("_")[1];
+            Identifier A_ID = createVariable(varName, "0", Types.ARRAY);
 
-            if(arrayType.equals("integer")) {
+            if(arrayType.equals("int")) {
               arrayType = Types.INT;
             } else if(arrayType.equals("double")) {
               arrayType = Types.DOUBLE;
@@ -1687,6 +1733,7 @@ functionDefinition
               arrayType = Types.BOOL;
             }
             A_ID.arrayType = arrayType;
+            generateArray(varName, arrayType, new String[] {});
 	            
         } else {
           createVariable(varName, "0", type);
@@ -1695,12 +1742,12 @@ functionDefinition
           System.out.println("Adding " + varName + " to " + $name + " scope");
         }      
       }
-      if(!$returnType.equals("void")) {
-        $doesReturn = true;
-        isFunctionReturning = 1;
-      } else {
+      if($returnType.equals("void")) {
         $doesReturn = false;
         isFunctionReturning = 0;
+      } else {
+        $doesReturn = true;
+        isFunctionReturning = 1;
       }
     }
     
@@ -1719,21 +1766,22 @@ functionDefinition
 
 functionCall
 	returns[String name, boolean doesReturn, boolean isSuccess, ArrayList<String> params, String code, String value, String asText]
-	locals[int arity, boolean isAssignment, String funType]:
+	locals[int arity, boolean isAssignment, String funcType]:
 	(
 		variable = VARIABLE_NAME '=' {
     $isAssignment = true;
   }
-	)? n = VARIABLE_NAME '(' (
-		v = varExprOrType {
-    $params = new ArrayList<String>();
-    $params.add($v.asText);
-    $arity +=1;
-  } (
-			',' v = varExprOrType {
-     $params.add($v.asText);
-     $arity +=1;
-  }
+	)? n = VARIABLE_NAME {
+	     $params = new ArrayList<String>();
+  } '(' (
+		(
+			t = type { $params.add($t.asText); $arity +=1; }
+			| v = VARIABLE_NAME { $params.add($v.getText()); $arity +=1; }
+		) (
+			',' (
+				t = type { $params.add($t.asText); $arity +=1; }
+				| v = VARIABLE_NAME { $params.add($v.getText()); $arity +=1; }
+			)
 		)*
 	)? ')' {
     $name = $n.getText();
@@ -1741,7 +1789,7 @@ functionCall
       error($n, "Error: attempting to call a function that does not exist");
     } else {
       FunctionIdentifier fid = getFunction($name);
-      $funType = fid.returnType;
+      $funcType = fid.returnType;
       if(fid.arity != $arity) {
         error($n, "attempting to call a function with incorrect number of arguments");
       } else {
@@ -1752,18 +1800,21 @@ functionCall
       for(int i =0; i < $arity; i++) {
         fid.assignOrReassign(i, $params.get(i));
       }
+        
+        call(fid.block_name);
 
         if($isAssignment) {
-	        Identifier ID = getVariable($variable.getText());
-            if(ID == null) {
-              ID = createVariable($variable.getText(), $code, $funType);
-              $code = $funType + " " + ID.id + "=" + $code;
-            } else {     
-              $code = ID.id + "=" + $code;
-        }
+        Identifier ID = getVariable($variable.getText());
+          if(ID == null) {
+            if($funcType.equals(Types.ARRAY)) {
+              generateArray($variable.getText(), fid.arrayTypeOrNull, new String[] {});
+            } else {
+              generateAssignOrReassign($variable.getText(), "0", $funcType);
+            }
+            ID = createVariable($variable.getText(), "0", $funcType);
+          } 
+          assignVarToVar(ID.id, fid.getReturnRef(), $funcType);
       }
-        
-        addCodeLine("jal " + fid.block_name);
 
     }
   };
@@ -1856,9 +1907,17 @@ varExprOrType
   }
 	| f = functionCall {
       $typeOf=Types.FUNCTION_CALL;
-      $asText = $f.value;
+      $asText = $f.name;
   };
-type: INT | STRING | DECIMAL | BOOL;
+type
+	returns[String asText]: (
+		v = INT
+		| v = STRING
+		| v = DECIMAL
+		| v = BOOL
+	) {
+    $asText = $v.getText();
+};
 
 STRING: '"' ( ~["])* '"';
 INT: '-'? [0-9]+;

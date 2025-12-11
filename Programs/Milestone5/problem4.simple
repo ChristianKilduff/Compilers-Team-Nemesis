@@ -1,6 +1,7 @@
 n = 0
-print "input the array size"
+print "input the array size: " inline
 input number n
+print ""
 
 while n less than or equal to 0 {
     print "Array size n must be positive. Try again"
@@ -12,46 +13,56 @@ clear listA
 
 i = 0
 
+temp = 0.0
 while i less than n{
-    input number temp
+    input decimal temp
     add temp to listA
     i = i plus 1
 }
 
-assign total index 0 from listA
+
 sum = 0.0
-assign min index 0 from listA
-assign max index 0 from listA
+min = 0.0
+max = 0.0
+assign min index 1 from listA
+assign max index 1 from listA
 
 i = 1
-
-while i less than n{
-    assign sum index i from listA
-    total = total plus sum
-
-    is sum less than min {
-        sum = min
-    } 
-    is sum greater than max {
-        sum = max
+len = 0
+assign len length of listA
+curr_val = 0.0
+repeat len {
+    assign curr_val index i from listA
+    sum = sum plus curr_val
+    is curr_val greater than max {
+        max=curr_val
+    } if not is curr_val less than min {
+        min=curr_val
     }
 
     i = i plus 1
 }
 
-mean = total divided by n
-
+mean = sum divide len
 above_mean = 0
-i = 0
-
-while i less than n{
-    is listA[i] greater than mean{
+i = 1
+print ""
+repeat len {
+    assign curr_val index i from listA
+    is curr_val greater than mean {
         above_mean = above_mean plus 1
     }
     i = i plus 1
 }
 
-print "mean = ", mean
-print "min = ", min
-print "max = ", max
-print "above_mean = ", above_mean
+
+print "mean = " inline
+print mean
+print "min = " inline
+print min
+print "max = " inline
+print max
+print "above_mean = " inline
+print above_mean
+
+

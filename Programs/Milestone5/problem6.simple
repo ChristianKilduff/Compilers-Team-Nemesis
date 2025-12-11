@@ -1,16 +1,30 @@
-param_list = [0.0]
 
-define read_array(int n) {
-    clear param_list
+
+define list_double read_array(int r_n) {
+    r_list = [0.0]
+    clear r_list
 
     print "Input " inline
-    print n inline
+    print r_n inline
     print " doubles:"
-    repeat n {
+
+    repeat r_n {
         i = 0.0
         input decimal i
-        add i to param_list
+        add i to r_list
+    }
+    return r_list
+}
+
+define print_array(list_double p_list, int p_n) {
+    i_p = 1
+    v = 0.0
+    repeat p_n {
+        assign v index i_p from p_list
+        print v
+        i_p = i_p plus 1
     }
 }
-read_array(4)
-print param_list
+
+list = [1.0, 2.0, 3.0, 4.0]
+print_array(list, 2)

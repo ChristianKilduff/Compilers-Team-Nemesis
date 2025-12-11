@@ -1,5 +1,9 @@
-a = 100
-b = 3
+list = [0.0]
 
-c = a mod b
-print c
+define list_double read_array(int n) {
+    
+    return list
+}
+
+list = read_array(2)
+print list
