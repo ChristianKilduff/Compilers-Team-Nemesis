@@ -1,9 +1,7 @@
-list = [0.0]
-
-define list_double read_array(int n) {
-    
-    return list
+define list_double i(int n) {
+    a = [5.0, 6.0, 7.0, 8.0]
+    return a
 }
 
-list = read_array(2)
-print list
+b = i(3)
+print b

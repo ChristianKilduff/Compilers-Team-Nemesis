@@ -43,12 +43,13 @@ grammar Simple;
       code.add(line);
     }
 
-    String getParamRef(int index) {
-      return "____PARAM____" + name + "_____" + index;
+	
+    String getReturnRef() {
+      return "____RETURN___"  + name + "_____";
     }
 
-    String getReturnRef() {
-      return "____RETURN____" + name + "____";
+    String getParamRef(int index) {
+      return "____PARAM____" + name + "_____" + index;
     }
 
     void assignOrReassign(int index, String value) {
@@ -284,17 +285,11 @@ grammar Simple;
       
       if(type.equals(Types.DOUBLE)) size *=2;
       addCodeLine(".data"
-        + "\n\t" + name + ": .space 400"
+        + "\n\t" + name + ": .space " + size
         + "\n\t" + sizeVarName +":   .word 0"
         + "\n\t.text\n");
     }
 
-    void cloneFrom(RiscArray arr) {
-      name = arr.name;
-      c = arr.c;
-      i = arr.i;
-      sizeVarName = arr.sizeVarName;
-    }
 
     void assignVarIndex(String var, String index, boolean isIndexVar) {
       addCodeLine("la t0, " + var); // t0=var address
@@ -371,7 +366,7 @@ grammar Simple;
     }
     
     void set(int index, String value, boolean isIndexVar, boolean isValueVar) {
-      
+        int s = type.equals(Types.DOUBLE) ? 3 : 2;
         String code = "";
 
         if(isIndexVar) {
@@ -383,7 +378,7 @@ grammar Simple;
         }
 
         code += "\n\tla t2, " + name  // t2 = array address
-        + "\n\tslli t3, t1, 2" // t3 = t1 * 4 (get the position of next avail slot)
+        + "\n\tslli t3, t1, " + s // t3 = t1 * 4 (get the position of next avail slot)
         + "\n\tadd t3, t2, t3"; //t3 = address of arr[i]
 
        
@@ -392,6 +387,30 @@ grammar Simple;
 
 
         addCodeLine(code);
+    } 
+
+
+    void copy(String toCopy) {
+    RiscArray arr = ARRAYS.get(toCopy);
+    String code = "la t0, " + name      // address of list to store into
+    + "\n\t" + "la t1, " + toCopy        // address of list to copy
+    + "\n\t" + "li t2, " + arr.size;        // number of bytes to copy
+
+    String loop_block = "_____copy_loop____" + data_count++;
+    code+="\n\t" + loop_block + ":"
+        + "\n\t" + "lb t3, 0(t1)"     // load byte from b
+        + "\n\t" + "sb t3, 0(t0)"      // store byte into a
+        + "\n\t" + "addi t0, t0, 1"   // move to next byte in self
+        + "\n\t" + "addi t1, t1, 1"   // move to next byte in toCopy
+        + "\n\t" + "addi t2, t2, -1"   // decrement counter
+        + "\n\t" + "bnez t2, " + loop_block;
+    
+    code += "\n\t" + "la t5, " + arr.sizeVarName;
+    code += "\n\t" + "lw t5, (t5)"; // t5 = other array size
+    code += "\n\t" + "la t4, " + sizeVarName; // t4 = self size address
+    code += "\n\t" + "sw t5, (t4)";
+
+    addCodeLine(code);
     }
 
 
@@ -848,7 +867,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
         + "\n\tfld fa0 (t0)" 
         + "\n\tla t2, " + toAssign 
         + "\n\tfsd fa0 (t2)\n";
-      }
+      } 
 
       return code;
   }
@@ -864,9 +883,14 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
       + "\n\tfld fa0 (t0)" 
       + "\n\tla t2, " + toAssign 
       + "\n\tfsd fa0 (t2)";
-    } else if(type.equals(Types.ARRAY) && ARRAYS.get(assignFrom) != null) {
-      RiscArray arr1 = ARRAYS.get(toAssign);
-      arr1.cloneFrom(ARRAYS.get(assignFrom));
+    } else if(type.equals(Types.ARRAY)) {
+      code = "";
+
+      RiscArray arrToChange = ARRAYS.get(toAssign);
+      
+      arrToChange.clear();
+      arrToChange.copy(assignFrom);
+
     }
 
     addCodeLine(code);
@@ -1193,13 +1217,13 @@ array
 
 statement:
 	append_to_array
-	| assignment
+	| functionCall
 	| remove_from_array
+	| assignment
 	| clear_array
 	| get_from_array
 	| replace_index_array
 	| array_length
-	| functionCall
 	| for_statement
 	| while_statement
 	| input
@@ -1219,7 +1243,7 @@ statement:
 	| return_block;
 
 return_block
-	locals[String typeOf]: (
+	returns[String typeOf, String value]: (
 		at = 'return' (
 			v = INT {$typeOf = Types.INT;}
 			| v = DECIMAL {$typeOf = Types.DOUBLE;}
@@ -1227,20 +1251,19 @@ return_block
 			| v = VARIABLE_NAME {$typeOf = Types.VARIABLE;}
 		)
 	) {
+    $value = $v.getText();
     if(isScopeGlobal()) {
       error($at, "error attempting to call return outside a function");
       } {
         if(isFunctionReturning == 1) {
           FunctionIdentifier fid = getFunction(getScope());
           if($typeOf.equals(Types.VARIABLE)) {
-            Identifier id = getVariable($v.getText());
-            
-
-            if(fid.arrayTypeOrNull != null)
+            Identifier id = getVariable($value);
+            if(fid.arrayTypeOrNull != null) 
               generateArray(fid.getReturnRef(), fid.arrayTypeOrNull, new String[] {});
-            assignVarToVar(fid.getReturnRef(), $v.getText(), fid.returnType);
+            assignVarToVar(fid.getReturnRef(), $value, fid.returnType);
           } else {
-            generateAssignOrReassign(fid.getReturnRef(), $v.getText(), fid.returnType);
+            generateAssignOrReassign(fid.getReturnRef(), $value, fid.returnType);
           }
           addReturnVoidCall();
         } else {
@@ -1718,29 +1741,28 @@ functionDefinition
       for(int i = 0; i < $variableParamNames.size(); i++) {
         String varName = $variableParamNames.get(i);
         String type = $paramTypes.get(i);
-        generateAssignOrReassign(varName, "0", type);
-          if (type.startsWith("list")) {
-	            String arrayType = type.split("_")[1];
-            Identifier A_ID = createVariable(varName, "0", Types.ARRAY);
+        if (type.startsWith("list")) {
+          String arrayType = type.split("_")[1];
+          Identifier A_ID = createVariable(varName, "0", Types.ARRAY);
 
-            if(arrayType.equals("int")) {
-              arrayType = Types.INT;
-            } else if(arrayType.equals("double")) {
-              arrayType = Types.DOUBLE;
-            } else if(arrayType.equals("string")) {
-              arrayType = Types.STRING;
-            } else if(arrayType.equals("boolean")) {
-              arrayType = Types.BOOL;
-            }
-            A_ID.arrayType = arrayType;
-            generateArray(varName, arrayType, new String[] {});
-	            
-        } else {
-          createVariable(varName, "0", type);
-        }
-        if(isDebug) {
-          System.out.println("Adding " + varName + " to " + $name + " scope");
-        }      
+          if(arrayType.equals("int")) {
+            arrayType = Types.INT;
+          } else if(arrayType.equals("double")) {
+            arrayType = Types.DOUBLE;
+          } else if(arrayType.equals("string")) {
+            arrayType = Types.STRING;
+          } else if(arrayType.equals("boolean")) {
+            arrayType = Types.BOOL;
+          }
+          A_ID.arrayType = arrayType;
+          generateArray(varName, arrayType, new String[] {});
+            
+      } else {
+        generateAssignOrReassign(varName, "0", type);
+        createVariable(varName, "0", type);
+      }
+      if(isDebug) 
+        System.out.println("Adding " + varName + " to " + $name + " scope");
       }
       if($returnType.equals("void")) {
         $doesReturn = false;
@@ -1765,22 +1787,41 @@ functionDefinition
 };
 
 functionCall
-	returns[String name, boolean doesReturn, boolean isSuccess, ArrayList<String> params, String code, String value, String asText]
+	returns[String name, boolean doesReturn, boolean isSuccess, ArrayList<String> params, ArrayList<String> paramTypes, String code, String value, String asText]
 	locals[int arity, boolean isAssignment, String funcType]:
 	(
 		variable = VARIABLE_NAME '=' {
     $isAssignment = true;
   }
 	)? n = VARIABLE_NAME {
-	     $params = new ArrayList<String>();
+      $name = $n.getText();
+      $params = new ArrayList<String>();
+      $paramTypes = new ArrayList<String>();
+        
   } '(' (
 		(
-			t = type { $params.add($t.asText); $arity +=1; }
-			| v = VARIABLE_NAME { $params.add($v.getText()); $arity +=1; }
+			t = type { 
+        $params.add($t.asText); 
+        $arity +=1; 
+        $paramTypes.add($t.typeOf);
+        }
+			| v = VARIABLE_NAME { 
+        $params.add($v.getText()); 
+        $arity +=1; 
+        $paramTypes.add(Types.VARIABLE);
+        }
 		) (
 			',' (
-				t = type { $params.add($t.asText); $arity +=1; }
-				| v = VARIABLE_NAME { $params.add($v.getText()); $arity +=1; }
+				t = type { 
+          $params.add($t.asText); 
+          $paramTypes.add($t.typeOf);
+          $arity +=1; 
+          }
+				| v = VARIABLE_NAME { 
+          $params.add($v.getText()); 
+          $arity +=1; 
+          $paramTypes.add(Types.VARIABLE);
+          }
 			)
 		)*
 	)? ')' {
@@ -1796,28 +1837,41 @@ functionCall
         $doesReturn = fid.doesReturn;
         $isSuccess = true;
       }
+    }
 
+	        
+      FunctionIdentifier fid = getFunction($name);
       for(int i =0; i < $arity; i++) {
-        fid.assignOrReassign(i, $params.get(i));
+        String input = $params.get(i);
+        String paramRef = fid.getParamRef(i);
+        String type = $paramTypes.get(i);
+        if(type.equals(Types.VARIABLE)) {
+          Identifier paramId = getVariable(input);
+          assignVarToVar(paramRef, input, type);
+        } else {
+          generateAssignOrReassign(paramRef, input, type);
+        }
       }
-        
         call(fid.block_name);
 
         if($isAssignment) {
-        Identifier ID = getVariable($variable.getText());
-          if(ID == null) {
+          Identifier assignVar = getVariable($variable.getText());
+          if(assignVar == null) {
             if($funcType.equals(Types.ARRAY)) {
-              generateArray($variable.getText(), fid.arrayTypeOrNull, new String[] {});
-            } else {
-              generateAssignOrReassign($variable.getText(), "0", $funcType);
+              RiscArray arr = ARRAYS.get($variable.getText());
+                if(arr == null) {
+                  generateArray($variable.getText(), fid.arrayTypeOrNull, new String[] {});
+                  assignVar= createVariable($variable.getText(), "0", $funcType);
+                  assignVar.arrayType = fid.arrayTypeOrNull;
+                }
+	            } else {
+                generateAssignOrReassign(assignVar.id, "0", $funcType);
+                assignVar = createVariable(assignVar.id, "0", $funcType);
             }
-            ID = createVariable($variable.getText(), "0", $funcType);
-          } 
-          assignVarToVar(ID.id, fid.getReturnRef(), $funcType);
-      }
-
+          }
+          assignVarToVar(assignVar.id, fid.getReturnRef(), $funcType);
     }
-  };
+};
 
 input: input_decimal | input_string | input_number;
 
@@ -1910,11 +1964,10 @@ varExprOrType
       $asText = $f.name;
   };
 type
-	returns[String asText]: (
-		v = INT
-		| v = STRING
-		| v = DECIMAL
-		| v = BOOL
+	returns[String asText, String typeOf]: (
+		v = INT {$typeOf = Types.INT;}
+		| v = STRING {$typeOf = Types.STRING;}
+		| v = DECIMAL {$typeOf = Types.DOUBLE;}
 	) {
     $asText = $v.getText();
 };
