@@ -4,10 +4,6 @@ define list_double read_array(int r_n) {
     r_list = [0.0]
     clear r_list
 
-    print "Input " inline
-    print r_n inline
-    print " doubles:"
-
     repeat r_n {
         i = 0.0
         input decimal i
@@ -16,9 +12,112 @@ define list_double read_array(int r_n) {
     return r_list
 }
 
-define print_array(list_double p_list, int p_n) {
-    print p_list
+define print_array(list_double plist) {
+    len = 0
+    c = 1
+    assign len length of plist
+    repeat len {
+        aa = 0.0
+        assign aa index c from plist
+
+        print aa inline
+        print " " inline
+        c = c plus 1
+    }
+
+    print ""
 }
 
-list = [1.0, 2.0, 3.0, 4.0]
-print_array(list, 2)
+define double sum_array(list_double plist) {
+    len = 0
+    assign len length of plist
+
+    c = 1
+    v = 0.0
+    sum_r = 0.0
+    repeat len {
+        assign v index c from plist 
+        sum_r = sum_r plus v
+        c = c plus 1
+    }
+
+    return sum_r
+}
+
+
+define double min_array(list_double plist) {
+    len = 0
+    assign len length of plist
+
+
+    c = 1
+    v = 0.0
+    min_r = 0.0
+    assign min_r index 1 from plist 
+    repeat len {
+        assign v index c from plist 
+        is v less than min_r {
+            min_r = v
+        }
+        c = c plus 1
+    }
+
+    return min_r
+}
+
+
+
+define double max_array(list_double plist) {
+    len = 0
+    assign len length of plist
+
+
+    c = 1
+    v = 0.0
+    max_r = 0.0
+    assign min_r index 1 from plist 
+    repeat len {
+        assign v index c from plist 
+        is v greater than max_r {
+            max_r = v
+        }
+        c = c plus 1
+    }
+
+    return max_r
+}
+
+
+size = 0
+print "Input size of array: " inline
+input number size
+list = read_array(size)
+print_array(list) 
+
+* or just use our print function cause it supports lists
+* print list 
+
+sum = 0.0
+sum = sum_array(list)
+
+
+min = 0.0
+min = min_array(list)
+max = 0.0
+max = max_array(list)
+print "sum=" inline
+print sum
+
+
+mean = 0.0
+is size not equal to 0 {
+    mean = sum divide size
+}
+
+
+print "mean=" inline
+print mean
+print "min=" inline
+print min
+print "max=" inline
+print max

@@ -195,9 +195,17 @@ grammar Simple;
       // return tables.get(tables.size() - 1);
   }
 
+  boolean doesGlobalVariableExist(String name) {
+    for(Identifier id : globalVariables) {
+      if(id != null && name.equals(id.id))
+        return true;
+    }
+    return false;
+  }
+
   Identifier createVariable(String name, String value, String type) {
     // if variable already exists in global or curr scope then cannot assign; return null
-    if(getVariable(name) != null) {
+    if(doesVariableExist(name)) {
       return null;
     }
     Identifier id = new Identifier();
@@ -213,13 +221,18 @@ grammar Simple;
 
 	  Identifier createGlobalScopeVariable(String name, String value, String type) {
     // if variable already exists in global or curr scope then cannot assign; return null
-    if(getVariable(name) != null) {
+    if(doesVariableExist(name)) {
       return null;
     }
     Identifier id = new Identifier();
     id.id = name;
     id.value = value;
-    id.type = type;
+    if(type.startsWith("list")) {
+      id.type = Types.ARRAY;
+      id.arrayType = type.split("_")[1].toLowerCase();
+    } else {
+      id.type = type;
+    }
     id.scope = "Global";
     id.scopeLevel = 0;
 	  getCurrSymbolTableAtCurrLevel().put(name, id);
@@ -228,7 +241,18 @@ grammar Simple;
   }
 
 
+  Identifier getGlobalVariable(String name) {
+    for(Identifier id : globalVariables) {
+      if(id != null && id.id.equals(name)) {
+        return id;
+      }
+    }
+
+    return null;
+  }
+
   Identifier getVariable(String name) {
+    if(getGlobalVariable(name) != null) return getGlobalVariable(name);
     String[] scopes;
     if (isScopeGlobal()) {
       scopes = new String[] {"Global"};
@@ -256,7 +280,7 @@ grammar Simple;
   RiscArray generateArray(String name, String type, String ... values) {
       RiscArray arr  = ARRAYS.get(name);
       if( arr == null) {
-        arr = new RiscArray(name, type);
+        arr = new RiscArray(name, type, !doesGlobalVariableExist(name));
         ARRAYS.put(name, arr);
       } else {
         arr.clear();
@@ -265,29 +289,35 @@ grammar Simple;
         arr.add(v, false);
       }
 
+        // System.out.println(arr.name + "   " + arr.sizeVarName);
       return arr;
   }
+
 
   int array_count = 0;
   class RiscArray {
     String name;
     int c = array_count++;
-    int i = 0;
     String type;
     String sizeVarName;
-    int size = 800;
+    int size = 1600;
 
-    public RiscArray(String name, String type) {
+    public RiscArray(String name, String type, boolean assignVar) {
       this.name = name;
       this.type = type;
-      i=array_count++;
-      sizeVarName = "count_arr_"+i;
-      
-      if(type.equals(Types.DOUBLE)) size *=2;
-      addCodeLine(".data"
-        + "\n\t" + name + ": .space " + size
+      sizeVarName = "count_arr_"+name;
+      if(assignVar) {
+        String code = "\n\t" + ".data"
         + "\n\t" + sizeVarName +":   .word 0"
-        + "\n\t.text\n");
+        + "\n\t" + name + ": .space " + size
+        + "\n\t" + ".text\n";
+        addCodeLine(code);
+      } 
+
+    }
+
+    public RiscArray(String name, String type) {
+      this(name, type, true);
     }
 
 
@@ -300,7 +330,7 @@ grammar Simple;
       }
       addCodeLine("addi t1, t1, -1");
 
-      i = type.equals(Types.DOUBLE) ? 3 : 2;
+      int i = type.equals(Types.DOUBLE) ? 3 : 2;
       String code = "\n\tla t2, " + name  // t2 = array address
       + "\n\tslli t3, t1, " + i // t3 = pos of index
       + "\n\tadd t3, t2, t3"; //t3 = address of arr[i]
@@ -390,27 +420,27 @@ grammar Simple;
     } 
 
 
-    void copy(String toCopy) {
-    RiscArray arr = ARRAYS.get(toCopy);
-    String code = "la t0, " + name      // address of list to store into
-    + "\n\t" + "la t1, " + toCopy        // address of list to copy
-    + "\n\t" + "li t2, " + arr.size;        // number of bytes to copy
+    String getCopyCode(String toCopy) {
+      RiscArray arr = ARRAYS.get(toCopy);
+      String code = "la t0, " + name      // address of list to store into
+      + "\n\t" + "la t1, " + toCopy        // address of list to copy
+      + "\n\t" + "li t2, " + arr.size;        // number of bytes to copy
+      code += "\n\t" + "la t5, " + arr.sizeVarName;
+      code += "\n\t" + "lw t5, (t5)"; // t5 = other array size
+      code += "\n\t" + "la t4, " + sizeVarName; // t4 = self size address
+      code += "\n\t" + "sw t5, (t4)";
 
-    String loop_block = "_____copy_loop____" + data_count++;
-    code+="\n\t" + loop_block + ":"
-        + "\n\t" + "lb t3, 0(t1)"     // load byte from b
-        + "\n\t" + "sb t3, 0(t0)"      // store byte into a
-        + "\n\t" + "addi t0, t0, 1"   // move to next byte in self
-        + "\n\t" + "addi t1, t1, 1"   // move to next byte in toCopy
-        + "\n\t" + "addi t2, t2, -1"   // decrement counter
-        + "\n\t" + "bnez t2, " + loop_block;
-    
-    code += "\n\t" + "la t5, " + arr.sizeVarName;
-    code += "\n\t" + "lw t5, (t5)"; // t5 = other array size
-    code += "\n\t" + "la t4, " + sizeVarName; // t4 = self size address
-    code += "\n\t" + "sw t5, (t4)";
-
-    addCodeLine(code);
+      String loop_block = "_____copy_loop____" + data_count++;
+      code+="\n\t" + loop_block + ":"
+          + "\n\t" + "lb t3, 0(t1)"     // load byte from b
+          + "\n\t" + "sb t3, 0(t0)"      // store byte into a
+          + "\n\t" + "addi t0, t0, 1"   // move to next byte in self
+          + "\n\t" + "addi t1, t1, 1"   // move to next byte in toCopy
+          + "\n\t" + "addi t2, t2, -1"   // decrement counter
+          + "\n\t" + "bnez t2, " + loop_block + "\n\t";
+      
+      
+      return code;
     }
 
 
@@ -473,7 +503,7 @@ grammar Simple;
   }
 
   boolean doesVariableExist(String varName) {
-    return getVariable(varName) != null;
+    return getVariable(varName) != null || doesGlobalVariableExist(varName);
   }
 
 
@@ -602,7 +632,8 @@ grammar Simple;
 
 
   void generateStringAssign(String name, String value) {
-    String s = "\n\t" + name + ": .word " + createGlobalString(value);
+    value = value.substring(1, value.length()-1);
+    String s = "\n\t.data\n\t" + name + ": .word " + createGlobalString(value) + "\n\t.text\n\t";
     addCodeLine(s);
   }
 
@@ -644,7 +675,8 @@ grammar Simple;
     createGlobalString("space", " ");
     emit("\t.data\n");
     for(Identifier var : globalVariables) {
-      // generateInitialAssign(var.id, "0", var.type);
+      if(var == null) continue;
+
       if(var.type.equals(Types.STRING)) {
         String tmp = "\t____" + var.id;
         emit(tmp + ": .asciz \"" + var.value + "\"\n\t");
@@ -654,6 +686,12 @@ grammar Simple;
       }
       else if(var.type.equals(Types.DOUBLE)) {
         emit(var.id +": .double " + var.value + "\n\t");
+      } else if(var.type.equals(Types.ARRAY)) {
+        RiscArray arr = new RiscArray(var.id, var.arrayType, false);
+        ARRAYS.put(arr.name, arr);
+        emit(var.id +": .space " + arr.size + "\n\t");
+       
+        emit(arr.sizeVarName +": .word " + 0 + "\n\t");
       }
     }
 
@@ -843,6 +881,7 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
             addCodeLine(printDouble);
           } else if(type.equals(Types.STRING)) {
             addCodeLine("lw a0, " + name);
+            // addCodeLine("lw a0, 0(t0)");
             
             String printStr = "li a7, 4"
             + "\n\tecall";
@@ -858,42 +897,35 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
 	  String getAssignVarToVar(String toAssign, String assignFrom, String type) {
       String code = "\n";
       if(type.equals(Types.INT) | type.equals(Types.STRING)) {
-        code += "la t0, " + assignFrom 
+        code = "la t0, " + assignFrom 
         + "\n\tlw t1 (t0)" 
         + "\n\tla t2, " + toAssign 
-        + "\n\tsw t1 (t2)\n";
+        + "\n\tsw t1 (t2)\n\t";
       } else if(type.equals(Types.DOUBLE)) {
-        code += "la t0, " + assignFrom 
+        code = "la t0, " + assignFrom 
         + "\n\tfld fa0 (t0)" 
         + "\n\tla t2, " + toAssign 
-        + "\n\tfsd fa0 (t2)\n";
-      } 
+        + "\n\tfsd fa0 (t2)\n\t";
+      }  else if(type.equals(Types.ARRAY)) {
+          code = "";
+
+          RiscArray fromArr = ARRAYS.get(assignFrom);
+          RiscArray arrToChange = ARRAYS.get(toAssign);
+          if(fromArr == null) return "";
+          if(arrToChange == null) {
+            arrToChange = generateArray(toAssign, fromArr.type, new String[] {});
+          } else {
+            arrToChange.clear();
+          }
+          // System.out.println("from " + assignFrom + ": " + fromArr + "| To " + toAssign + ": " + arrToChange);
+
+          code = arrToChange.getCopyCode(assignFrom);
+    }
 
       return code;
   }
   void assignVarToVar(String toAssign, String assignFrom, String type) {
-    String code = "";
-    if(type.equals(Types.INT) | type.equals(Types.STRING)) {
-      code = "la t0, " + assignFrom 
-      + "\n\tlw t1 (t0)" 
-      + "\n\tla t2, " + toAssign 
-      + "\n\tsw t1 (t2)";
-    } else if(type.equals(Types.DOUBLE)) {
-	    code = "la t0, " + assignFrom 
-      + "\n\tfld fa0 (t0)" 
-      + "\n\tla t2, " + toAssign 
-      + "\n\tfsd fa0 (t2)";
-    } else if(type.equals(Types.ARRAY)) {
-      code = "";
-
-      RiscArray arrToChange = ARRAYS.get(toAssign);
-      
-      arrToChange.clear();
-      arrToChange.copy(assignFrom);
-
-    }
-
-    addCodeLine(code);
+		addCodeLine(getAssignVarToVar(toAssign,assignFrom, type));
   }
 
   
@@ -918,10 +950,13 @@ Map<String,String> genConditionalCodeHelper(String a, String type, int i) {
     for(int i = 0; i < fid.arity; i++) {
       String var_name = fid.paramNames.get(i);
       String param_name = fid.getParamRef(i);
+      String param_type = fid.paramTypes.get(i);
+      if(param_type.startsWith("list")) {
+        param_type = Types.ARRAY;
+      }
+      code+="\n\t" + getAssignVarToVar(var_name, param_name, param_type);
 
-      code+="\n\t" + getAssignVarToVar(var_name, param_name, fid.paramTypes.get(i));
     }
-
 
     return code;
   }
@@ -1088,9 +1123,6 @@ assignment
 	      Identifier var = getVariable($v.getText());
       if(var == null) {
           error($v, "Error variable " + $v.getText() + " does not exist");
-          $isError = true;
-      } else if (var.scope != "Global" && var.scope != getScope()) {
-          error($v, "Error attempting to assign a variable that is not defined (there is a variable defined that is out of scope)");
           $isError = true;
       } else {
         $value = var.value;    
@@ -1697,36 +1729,36 @@ functionDefinition
     $varTypeAndName = new ArrayList<String>();
     $paramTypes = new ArrayList<String>();
   } '(' (
-		VARIABLE_NAME {
-      $varType = $VARIABLE_NAME.getText();
-        if ($varType.startsWith("list")){
-          // $varType = Types.ARRAY;
-        }else if($varType.equals("int")) {
-          $varType = Types.INT;
-        }else if($varType.equals("double")) {
-          $varType = Types.DOUBLE;
-        } if($varType.equals("string")) {
-          $varType = Types.STRING;
-        }
+		t = VARIABLE_NAME {
+      $varType = $t.getText();
+        // if ($varType.startsWith("list")){
+        //   // $varType = Types.ARRAY;
+        // }else if($varType.equals("int")) {
+        //   $varType = Types.INT;
+        // }else if($varType.equals("double")) {
+        //   $varType = Types.DOUBLE;
+        // } if($varType.equals("string")) {
+        //   $varType = Types.STRING;
+        // }
       $paramTypes.add($varType);
-    } VARIABLE_NAME {
-		      $variableParamNames.add($VARIABLE_NAME.getText());
+    } v = VARIABLE_NAME {
+		      $variableParamNames.add($v.getText());
     } (
-			',' VARIABLE_NAME {
-        $varType = $VARIABLE_NAME.getText();
-        if ($varType.startsWith("list")){
-          $varType = Types.ARRAY;
-        } else  if($varType.equals("int")) {
-          $varType = Types.INT;
-        }else if($varType.equals("double")) {
-          $varType = Types.DOUBLE;
-        } if($varType.equals("string")) {
-          $varType = Types.STRING;
-        }
+			',' t = VARIABLE_NAME {
+        $varType = $t.getText();
+        // if ($varType.startsWith("list")){
+        //   $varType = Types.ARRAY;
+        // } else  if($varType.equals("int")) {
+        //   $varType = Types.INT;
+        // }else if($varType.equals("double")) {
+        //   $varType = Types.DOUBLE;
+        // } if($varType.equals("string")) {
+        //   $varType = Types.STRING;
+        // }
 
         $paramTypes.add($varType);
-      } VARIABLE_NAME {
-	        $variableParamNames.add($VARIABLE_NAME.getText());
+      } v = VARIABLE_NAME {
+        $variableParamNames.add($v.getText());
       }
 		)*
 	)? ')' '{' { 
@@ -1740,27 +1772,17 @@ functionDefinition
 
       for(int i = 0; i < $variableParamNames.size(); i++) {
         String varName = $variableParamNames.get(i);
+        if(doesVariableExist(varName)) {
+          addCodeLine("\n");
+          continue;
+        }
         String type = $paramTypes.get(i);
+        Identifier A_ID = createGlobalScopeVariable(varName, "0", type);
+        globalVariables.add(A_ID);
         if (type.startsWith("list")) {
-          String arrayType = type.split("_")[1];
-          Identifier A_ID = createVariable(varName, "0", Types.ARRAY);
-
-          if(arrayType.equals("int")) {
-            arrayType = Types.INT;
-          } else if(arrayType.equals("double")) {
-            arrayType = Types.DOUBLE;
-          } else if(arrayType.equals("string")) {
-            arrayType = Types.STRING;
-          } else if(arrayType.equals("boolean")) {
-            arrayType = Types.BOOL;
-          }
-          A_ID.arrayType = arrayType;
+          String arrayType = type.split("_")[1].toLowerCase();
           generateArray(varName, arrayType, new String[] {});
-            
-      } else {
-        generateAssignOrReassign(varName, "0", type);
-        createVariable(varName, "0", type);
-      }
+        }
       if(isDebug) 
         System.out.println("Adding " + varName + " to " + $name + " scope");
       }
@@ -1847,7 +1869,7 @@ functionCall
         String type = $paramTypes.get(i);
         if(type.equals(Types.VARIABLE)) {
           Identifier paramId = getVariable(input);
-          assignVarToVar(paramRef, input, type);
+          assignVarToVar(paramRef, input, paramId.type);
         } else {
           generateAssignOrReassign(paramRef, input, type);
         }
@@ -1877,15 +1899,16 @@ input: input_decimal | input_string | input_number;
 
 input_string:
 	'input string ' a = VARIABLE_NAME {
-        addCodeLine(".data \n\ttmp_input_space: .space 200 \n\t.text");
+        String storeVar = "input_space_____" + data_count++;
+        addCodeLine(".data \n\t" + storeVar+ " : .space 200 \n\t.text");
         addCodeLine("li a7, 8"
-        + "\n\t la a0, tmp_input_space"  // address to store to
+        + "\n\t la a0, " + storeVar // address to store to
         + "\n\tli a1, 200" // max length
         + "\n\tecall");        
 
         // assign var string tmp_input_space
         addCodeLine("la t0, " + $a.getText()
-	        + "\n\tla t1, tmp_input_space"
+        + "\n\tla t1, " + storeVar
         + "\n\tsw t1, (t0)");
 };
 input_number:
