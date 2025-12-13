@@ -1881,9 +1881,6 @@ functionCall
 	locals[int arity, boolean isAssignment, String funcType]:
 	(
 		variable = VARIABLE_NAME '=' {
-      if(!doesVariableExist($variable.getText())) {
-        error($variable, "Variable does not exist, define variable before assigning a function call");
-      }
     $isAssignment = true;
   }
 	)? n = VARIABLE_NAME {
@@ -1921,6 +1918,8 @@ functionCall
     $name = $n.getText();
     if(!doesFunctionExist($name)) {
       error($n, "Error: attempting to call a function that does not exist");
+    } else  if(!doesVariableExist($variable.getText())) {
+      error($variable, "Variable does not exist, define variable before assigning a function call");
     } else {
       FunctionIdentifier fid = getFunction($name);
       $funcType = fid.returnType;
@@ -1929,11 +1928,7 @@ functionCall
       } else {
         $doesReturn = fid.doesReturn;
         $isSuccess = true;
-      }
-    }
 
-	        
-      FunctionIdentifier fid = getFunction($name);
       for(int i =0; i < $arity; i++) {
         String input = $params.get(i);
         String paramRef = fid.getParamRef(i);
@@ -1963,6 +1958,8 @@ functionCall
             }
           }
           assignVarToVar(assignVar.id, fid.getReturnRef(), $funcType);
+        }
+      }
     }
 };
 
@@ -1998,31 +1995,25 @@ input_decimal:
 };
 
 printType
-	returns[Boolean hasKnownValue, String value, boolean isVar]:
-	(v = INT | v = DECIMAL) {
-    $hasKnownValue = true; 
+	returns[String value, boolean isVar]:
+	(v = INT | v = DECIMAL) { 
     $value = $v.getText();
   }
 	| STRING {
-    $hasKnownValue = true; 
     $value = $STRING.getText();
 
     // remove ""
 	    $value = $value.substring(1, $value.length() - 1);
     }
 	| VARIABLE_NAME {
-      $isVar = true;
-        Identifier id = getVariable($VARIABLE_NAME.getText());
-        used.add(id.id);
-        // If we're in the middle of first assignment to VARIABLE_NAME (self-reference):
-        if (id == null) {
-          // General use-before-assign.
+        $isVar = true;
+        if (!doesVariableExist($VARIABLE_NAME.getText())) {
 	          error($VARIABLE_NAME, "use of variable '" + $VARIABLE_NAME.getText() + "' before assignment");
         } else{
+          Identifier id = getVariable($VARIABLE_NAME.getText());
           // var exists
           printVar(id.id, id.type);
         }
-        $hasKnownValue = false;
       };
 
 output
@@ -2034,8 +2025,9 @@ output
   }
 		)?
 	) {
+
     if(!$v.isVar) addPrintLine($v.value);
-      if(!$inline) addPrintNewLine();
+    if(!$inline) addPrintNewLine();
     
 };
 

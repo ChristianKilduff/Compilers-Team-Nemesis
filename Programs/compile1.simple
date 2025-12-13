@@ -2,6 +2,6 @@ define int add(int x, int y) {
     s = x plus y
     return s
 }
-
+p = 0
 p = add(1,2)
 print p
