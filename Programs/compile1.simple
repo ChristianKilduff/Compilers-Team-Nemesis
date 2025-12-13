@@ -1,7 +1,7 @@
-
-repeat 3 {
-    print "3"
-    repeat 2 {
-        print "2"
-    }
+define int add(int x, int y) {
+    s = x plus y
+    return s
 }
+
+p = add(1,2)
+print p
