@@ -1,5 +1,7 @@
-list = [0, 1, 2]
-v = 23
-i=2
-remove index i from list
-print list
+
+repeat 3 {
+    print "3"
+    repeat 2 {
+        print "2"
+    }
+}

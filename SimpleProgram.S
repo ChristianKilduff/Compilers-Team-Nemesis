@@ -5,103 +5,52 @@
 
 main:
 	.data
-	____space: .asciz " "
+	________tmp_str_____0: .asciz "3"
+	____tmp_str_____0: .word 	________tmp_str_____0
+		________tmp_str_____1: .asciz "2"
+	____tmp_str_____1: .word 	________tmp_str_____1
+		____space: .asciz " "
 	space: .word 	____space
 	.text
 
-	
 	.data
-	count_arr_list:   .word 0
-	list: .space 1600
+	____loop_index____1: .word 0
 	.text
+	la t0, ____loop_index____1
+	li t1, 3
+	sw t1, (t0)
+	______protected___loop____1:
+	la t0, ____loop_index____1
+	lw t1, (t0)
+	beqz t1, ____return_from______protected___loop____1
+	addi t1, t1, -1
+	sw t1, (t0)
+	lw a0, ____tmp_str_____0
+	li    a7, 4
+	ecall
 
-	
-	#====
-	la t0, count_arr_list
-	lw t1, 0(t0)
-	la t2, list
-	slli t3, t1, 2
-	add t3, t2, t3
-	li t4, 0
-	sw t4, 0(t3)
-	addi t1, t1, 1
-	la t0, count_arr_list
-	sw t1, 0(t0)
-	#_____
-	
-	
-	#====
-	la t0, count_arr_list
-	lw t1, 0(t0)
-	la t2, list
-	slli t3, t1, 2
-	add t3, t2, t3
-	li t4, 1
-	sw t4, 0(t3)
-	addi t1, t1, 1
-	la t0, count_arr_list
-	sw t1, 0(t0)
-	#_____
-	
-	
-	#====
-	la t0, count_arr_list
-	lw t1, 0(t0)
-	la t2, list
-	slli t3, t1, 2
-	add t3, t2, t3
-	li t4, 2
-	sw t4, 0(t3)
-	addi t1, t1, 1
-	la t0, count_arr_list
-	sw t1, 0(t0)
-	#_____
-	
-	.data
-	v: .word 23
-	.text
-	.data
-	i: .word 2
-	.text
-	la t0, i
-	lw t0, (t0)
-	addi t0, t0, -1
-	la t1, count_arr_list
-	lw t2, 0(t1)
-	addi t2, t2, -1
-	la   t3, list
-	______remove_loop_______0:
-	bge  t0, t2, _____DONE_____REMOVE_____1
-	slli t4, t0, 2
-	add  t5, t3, t4
-	lw t6, 4(t5)
-	sw t6, 0(t5)
-	addi t0, t0, 1
-	j ______remove_loop_______0
-	_____DONE_____REMOVE_____1:
-	sw   t2, 0(t1)
-	
-	la t0, list
-	lw t1, count_arr_list
-	li t2, 0 
-	
-	____print_arr_____loop_2:
-	bge t2, t1, ____print_arr_____done_2
-	slli t3, t2, 2    # t3 = index * 4 (word size)
-	add t3, t0, t3    # t3 = address of arr[index]
-	lw a0, 0(t3)      # load integer into a0
-	li a7, 1
-	ecall
-	
-	lw a0, space
-	li a7, 4
-	ecall
-	addi t2, t2, 1
-	j ____print_arr_____loop_2
-	
-	____print_arr_____done_2:
-	
 	jal ra, print_newline
+	.data
+	____loop_index____2: .word 0
+	.text
+	la t0, ____loop_index____2
+	li t1, 2
+	sw t1, (t0)
+	______protected___loop____2:
+	la t0, ____loop_index____2
+	lw t1, (t0)
+	beqz t1, ____return_from______protected___loop____2
+	addi t1, t1, -1
+	sw t1, (t0)
+	lw a0, ____tmp_str_____1
+	li    a7, 4
+	ecall
+
+	jal ra, print_newline
+	j ______protected___loop____2
+	____return_from______protected___loop____2:
+	j ______protected___loop____1
+	____return_from______protected___loop____1:
 	jal end
 
 print_newline:
