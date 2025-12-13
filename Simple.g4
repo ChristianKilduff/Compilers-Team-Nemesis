@@ -1881,6 +1881,9 @@ functionCall
 	locals[int arity, boolean isAssignment, String funcType]:
 	(
 		variable = VARIABLE_NAME '=' {
+      if(!doesVariableExist($variable.getText())) {
+        error($variable, "Variable does not exist, define variable before assigning a function call");
+      }
     $isAssignment = true;
   }
 	)? n = VARIABLE_NAME {
