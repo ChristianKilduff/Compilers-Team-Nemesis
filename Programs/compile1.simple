@@ -1,5 +1,5 @@
 define int add(int x, int y) {
-    s = x plus y
+    s = x plus y plus x
     return s
 }
 p = 0
