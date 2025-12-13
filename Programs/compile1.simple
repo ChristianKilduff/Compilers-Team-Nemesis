@@ -1,3 +1,5 @@
-i = ""
-input string i
-print i
+list = [0, 1, 2]
+v = 23
+i=2
+remove index i from list
+print list

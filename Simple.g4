@@ -395,14 +395,14 @@ grammar Simple;
 	      assignVarToVar(varName, sizeVarName, Types.INT);
     }
     
-    void set(int index, String value, boolean isIndexVar, boolean isValueVar) {
+    void set(String index, String value, boolean isIndexVar, boolean isValueVar) {
         int s = type.equals(Types.DOUBLE) ? 3 : 2;
         String code = "";
 
         if(isIndexVar) {
           code+="la t0, " + index // t0 = size address
         + "\n\tlw t1, (t0)" // t1 = index
-        + "\n\taddi t1, -1"; // t1 - 1
+        + "\n\taddi t1, t1, -1"; // t1 - 1
         } else {
           code+="li t1, " + index;
         }
@@ -411,9 +411,31 @@ grammar Simple;
         + "\n\tslli t3, t1, " + s // t3 = t1 * 4 (get the position of next avail slot)
         + "\n\tadd t3, t2, t3"; //t3 = address of arr[i]
 
-       
-        code += "\n\tlw t4, " + value // t4 = value to add
-        + "\n\tsw t4, 0(t3)";  // store into arr
+       if(isValueVar) {
+        if(s == 3) {
+          code += "\n\t" + "la t4, " + value 
+          + "\n\t" + "fld fa2, (t4)" // t4 = value to add
+          + "\n\t" + "fsd fa2, 0(t3)";  // store into arr
+        } else {
+          code += "\n\t" + "la t4, " + value 
+          + "\n\t" + "lw t4, (t4)" // t4 = value to add
+          + "\n\t" + "sw t4, 0(t3)";  // store into arr
+        }
+       } else {
+        if(s == 3) {
+          String tmpd = "___TMP_DOUBLE_____" + data_count++;
+          code += "\n\t" + ".data"
+          + "\n\t" + tmpd + ": .double " + value
+          + "\n\t" + ".text";
+
+          code += "\n\t" + "la t4, " + tmpd
+          + "\n\t" + "fld fa0, (t4)"
+          + "\n\t" + "fsd fa0, 0(t3)";
+        } else {
+          code += "\n\t" + "li t4, " + value
+          + "\n\t" + "sw t4, 0(t3)";
+        }
+       }
 
 
         addCodeLine(code);
@@ -444,8 +466,47 @@ grammar Simple;
     }
 
 
-    void remove(int index) {
-      
+    void remove(String index, boolean isIndexVar) {
+	       
+    String rmLoop = "______remove_loop_______" + data_count++;
+    String done = "_____DONE_____REMOVE_____" + data_count++;
+
+    int s = type.equals(Types.DOUBLE) ? 3 : 2;
+
+    String code = "";
+    if(isIndexVar) {
+      code = "la t0, " + index
+      + "\n\t" + "lw t0, (t0)"
+      + "\n\t" + "addi t0, t0, -1";
+    } else {
+      code = "li t0, " + index;
+    }
+
+    code += "\n\t" + "la t1, " + sizeVarName
+    + "\n\t" + "lw t2, 0(t1)"
+    + "\n\t" + "addi t2, t2, -1"
+    + "\n\t" + "la   t3, " + name
+    
+    + "\n\t" + rmLoop + ":"
+    + "\n\t" + "bge  t0, t2, " + done
+
+    + "\n\t" + "slli t4, t0, " + s
+    + "\n\t" + "add  t5, t3, t4";
+
+    if(s == 2) {
+      code += "\n\t" + "lw t6, 4(t5)"
+	    + "\n\t" + "sw t6, 0(t5)";
+    } else {
+		  code += "\n\t" + "fld fa0, 8(t5)"
+      + "\n\t" + "fsd fa0, 0(t5)";
+    }
+
+    code += "\n\t" + "addi t0, t0, 1"    
+    + "\n\t" + "j " + rmLoop
+    + "\n\t" + done + ":"
+    + "\n\t" + "sw   t2, 0(t1)";
+
+    addCodeLine(code);
     }
 
     void clear() {
@@ -1359,30 +1420,37 @@ array_length:
       }
   };
 replace_index_array
-	locals[int index, boolean isIndexVar]:
+	locals[String index, boolean isIndexVar, boolean isValueVar]:
 	'replace index ' (
 		i = INT {
-        $index = Integer.parseInt($i.getText()) - 1;
+        $index = "" + (Integer.parseInt($i.getText()) - 1);
 	  }
 		| i_v = VARIABLE_NAME {
 		    $isIndexVar = true;
+        $index = $i_v.getText();
     }
-	) ' with ' v = varExprOrType ' from ' n = VARIABLE_NAME {
+	) ' with ' (
+		v = STRING
+		| v = INT
+		| v = DECIMAL
+		| v = VARIABLE_NAME {$isValueVar = true;}
+	) ' from ' n = VARIABLE_NAME {
     RiscArray arr = ARRAYS.get($n.getText());
     if(arr == null) {
       error($n, "Error array does not exist");
     } else {
-      arr.set($index, $v.asText, $isIndexVar, $v.isVar);
+      arr.set($index, $v.getText(), $isIndexVar, $isValueVar);
     }
 };
 remove_from_array
-	locals[String index_code, int index]:
+	locals[String index_code, String index, boolean isVar]:
 	'remove index ' (
 		i = INT {
-      int index = Integer.parseInt($i.getText()) - 1;
+      $index = "" + (Integer.parseInt($i.getText()) - 1);
     }
 		| v = VARIABLE_NAME {
-    // TODO
+      $isVar = true;
+      $index = $v.getText();
   }
 	) ' from ' n = VARIABLE_NAME {
     RiscArray arr = ARRAYS.get($n.getText());
@@ -1390,7 +1458,7 @@ remove_from_array
     if(arr == null) {
       error($n, "Error array does not exist");
     } else {
-      arr.remove($index);
+      arr.remove($index, $isVar);
     }
 };
 

@@ -5,113 +5,102 @@
 
 main:
 	.data
-	________tmp_str_____0: .asciz ""
-	____tmp_str_____0: .word 	________tmp_str_____0
-		________tmp_str_____2: .asciz "Hello, "
-	____tmp_str_____2: .word 	________tmp_str_____2
-		________tmp_str_____3: .asciz "total = "
-	____tmp_str_____3: .word 	________tmp_str_____3
-		________tmp_str_____4: .asciz "savings = "
-	____tmp_str_____4: .word 	________tmp_str_____4
-		____space: .asciz " "
+	____space: .asciz " "
 	space: .word 	____space
 	.text
 
 	
 	.data
-	name: .word ____tmp_str_____0
+	count_arr_list:   .word 0
+	list: .space 1600
 	.text
+
+	
+	#====
+	la t0, count_arr_list
+	lw t1, 0(t0)
+	la t2, list
+	slli t3, t1, 2
+	add t3, t2, t3
+	li t4, 0
+	sw t4, 0(t3)
+	addi t1, t1, 1
+	la t0, count_arr_list
+	sw t1, 0(t0)
+	#_____
+	
+	
+	#====
+	la t0, count_arr_list
+	lw t1, 0(t0)
+	la t2, list
+	slli t3, t1, 2
+	add t3, t2, t3
+	li t4, 1
+	sw t4, 0(t3)
+	addi t1, t1, 1
+	la t0, count_arr_list
+	sw t1, 0(t0)
+	#_____
+	
+	
+	#====
+	la t0, count_arr_list
+	lw t1, 0(t0)
+	la t2, list
+	slli t3, t1, 2
+	add t3, t2, t3
+	li t4, 2
+	sw t4, 0(t3)
+	addi t1, t1, 1
+	la t0, count_arr_list
+	sw t1, 0(t0)
+	#_____
 	
 	.data
-	income: .double 0.0
+	v: .word 23
 	.text
 	.data
-	rent: .double 0.0
+	i: .word 2
 	.text
-	.data
-	food: .double 0.0
-	.text
-	.data
-	fun: .double 0.0
-	.text
-	.data 
-	input_space_____1 : .space 200 
-	.text
-	li a7, 8
-	 la a0, input_space_____1
-	li a1, 200
+	la t0, i
+	lw t0, (t0)
+	addi t0, t0, -1
+	la t1, count_arr_list
+	lw t2, 0(t1)
+	addi t2, t2, -1
+	la   t3, list
+	______remove_loop_______0:
+	bge  t0, t2, _____DONE_____REMOVE_____1
+	slli t4, t0, 2
+	add  t5, t3, t4
+	lw t6, 4(t5)
+	sw t6, 0(t5)
+	addi t0, t0, 1
+	j ______remove_loop_______0
+	_____DONE_____REMOVE_____1:
+	sw   t2, 0(t1)
+	
+	la t0, list
+	lw t1, count_arr_list
+	li t2, 0 
+	
+	____print_arr_____loop_2:
+	bge t2, t1, ____print_arr_____done_2
+	slli t3, t2, 2    # t3 = index * 4 (word size)
+	add t3, t0, t3    # t3 = address of arr[index]
+	lw a0, 0(t3)      # load integer into a0
+	li a7, 1
 	ecall
-	la t0, name
-	la t1, input_space_____1
-	sw t1, (t0)
-	li a7, 7
-	ecall
-	la t0, income
-	fsd fa0 (t0)
-	li a7, 7
-	ecall
-	la t0, rent
-	fsd fa0 (t0)
-	li a7, 7
-	ecall
-	la t0, food
-	fsd fa0 (t0)
-	li a7, 7
-	ecall
-	la t0, fun
-	fsd fa0 (t0)
-	.data
-	total: .double 0
-	.text
-	la t0, rent
-	fld fa0, 0(t0)
-	la t1, food
-	fld fa1, 0(t1)
-	la t2, total
-	fadd.d fa2, fa0, fa1
-	fsd fa2, (t2)
-	la t0, total
-	fld fa0, 0(t0)
-	la t1, fun
-	fld fa1, 0(t1)
-	la t2, total
-	fadd.d fa2, fa0, fa1
-	fsd fa2, (t2)
-	.data
-	savings: .double 0
-	.text
-	la t0, income
-	fld fa0, 0(t0)
-	la t1, total
-	fld fa1, 0(t1)
-	la t2, savings
-	fsub.d fa2, fa0, fa1
-	fsd fa2, (t2)
-	lw a0, ____tmp_str_____2
-	li    a7, 4
-	ecall
-
-	lw a0, name
+	
+	lw a0, space
 	li a7, 4
 	ecall
-	jal ra, print_newline
-	lw a0, ____tmp_str_____3
-	li    a7, 4
-	ecall
-
-	la t0, total
-	fld fa0, (t0)
-	li a7, 3
-	ecall
-	jal ra, print_newline
-	lw a0, ____tmp_str_____4
-	li    a7, 4
-	ecall
-
-	la t0, savings
-	fld fa0, (t0)
-	li a7, 3
-	ecall
+	addi t2, t2, 1
+	j ____print_arr_____loop_2
+	
+	____print_arr_____done_2:
+	
 	jal ra, print_newline
 	jal end
 
